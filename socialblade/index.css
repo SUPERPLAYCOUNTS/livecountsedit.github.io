@@ -1,3 +1,8 @@
+.short-input {
+    width: 6vw;
+}
+
+
 h1, h2, h3, h4, h5, h6, p, ol, ul, li,
 fieldset, form, label, legend,
 table, caption, tbody, tfoot, thead, tr, th, td,
@@ -3787,6 +3792,18 @@ div.page-realtime-body .containment:after {
     display: inline;
     cursor: pointer;
     width: 100vw;
+}
+
+.realtime-username-youtube {
+    position: relative;
+}
+
+.platform-icon {
+    position: absolute;
+    top: 36px;
+    margin-left: 8px;
+    height: 1.6em;
+    display: inline;
 }
 
 .realtime-username-youtube { color: #b3382c!important; }
