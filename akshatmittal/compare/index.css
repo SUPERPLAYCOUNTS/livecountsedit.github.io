@@ -368,10 +368,6 @@ textarea {
     overflow: hidden;
 }
 
-.card-no-border .card .card-img-top {
-    filter: blur(7px);
-}
-
 #main-wrapper {
     width: 100%;
 }
@@ -1037,6 +1033,15 @@ sidebar navigation
 
 .display-title {
     text-align: center;
+}
+
+.trophy-icon {
+    position: absolute;
+    width: 25px;
+    height: auto; 
+    left: 0px; 
+    top: 2px; 
+    object-fit: contain; 
 }
 
 @media (max-width: 1260px) {

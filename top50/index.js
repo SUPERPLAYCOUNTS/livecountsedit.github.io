@@ -3,14 +3,34 @@ let auditTimeout;
 let saveInterval;
 let chart;
 let nextUpdateAudit = false;
-let popups = [];
 let specificChannels = [];
 let pickingChannels = false;
+let quickSelecting = false;
+let odometers = [];
+let iso;
+let data = {};
+function escapeHTML(text) {
+    if (text) {
+        text = text.toString();
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+}
 function abb(n) {
     let s = Math.sign(n);
     n = Math.abs(n);
     if (n < 1) return 0;
-    else return s*Math.floor(n/(10**(Math.floor(Math.log10(n))-2)))*(10**(Math.floor(Math.log10(n))-2))
+    else return Math.floor(s * Math.floor(n / (10 ** (Math.floor(Math.log10(n)) - 2))) * (10 ** (Math.floor(Math.log10(n)) - 2)))
+}
+function getDisplayedCount(n) {
+    if (!isFinite(n)) n = 0;
+    if (!data.allowNegative && n < 0) n = 0;
+    if (data.abbreviate) return abb(n);
+    else return Math.floor(n);
 }
 const uuidGen = function () {
     let a = function () {
@@ -33,9 +53,9 @@ function random(min, max) {
 function adjustColors() {
     let c = document.body.style.backgroundColor;
     if (!c) return;
-    let r,g,b;
+    let r, g, b;
     if (c.startsWith('#')) {
-        c = c.replace('#','');
+        c = c.replace('#', '');
         const color = parseInt(c, 16);
         r = (color >> 16);
         g = (color >> 8) & 0xff;
@@ -47,35 +67,81 @@ function adjustColors() {
         g = color[1];
         b = color[2];
     }
-    const brightness = (0.2126*r+0.7152*g+0.0722*b)/255;
+    const brightness = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     const textLabels = document.querySelectorAll("label,h1,h2,h3,h4,h5,h6,p,strong,input[type=file]");
     if (brightness < 0.5) {
         for (i = 0; i < textLabels.length; i++) {
-            textLabels[i].style.color = '#fff';
+            if (!textLabels[i].classList.contains('subgap')) {
+                textLabels[i].style.color = '#fff';
+            }
         }
     } else {
         for (i = 0; i < textLabels.length; i++) {
-            textLabels[i].style.color = '#000';
+            if (!textLabels[i].classList.contains('subgap')) {
+                textLabels[i].style.color = '#000';
+            }
         }
     }
 }
+
+function mergeWithExampleData(imported, example) {
+    if (typeof imported !== 'object' || imported === null) return example;
+    for (let key in example) {
+        if (!imported.hasOwnProperty(key)) {
+            imported[key] = example[key];
+        } else if (typeof example[key] === 'object' && !Array.isArray(example[key])) {
+            imported[key] = mergeWithExampleData(imported[key], example[key]);
+        }
+    }
+
+    return imported;
+}
+
 let uuid = uuidGen()
-let data = {
+let example_data = {
     "showImages": true,
     "showNames": true,
     "showCounts": true,
     "showRankings": true,
-    "bgColor": "#FFF",
+    "rankingsWidth": '10',
+    "showBlankSlots": true,
+    "showDifferences": false,
+    "differenceThreshold": 100,
+    "differenceStyles": {
+        "left": "75",
+        "top": "-5",
+        "color": "green",
+        "imageLeft": "10",
+        "imageTop": "-5",
+        "imageSize": "50",
+        "imageEnabled": false,
+        "shakingEnabled": true,
+        "differenceImage": "./mdm_gifs/lightning.png",
+        "differenceSize": '5',
+    },
+    "cardStyles": {
+        "cardWidth": '',
+        "cardHeight": '',
+        "imageSize": '',
+        "nameSize": '',
+        "countSize": '',
+        "rankSize": '',
+    },
+    "bgColor": "#141414",
     "textColor": "#000",
     "boxColor": "#f7f5fe",
     "boxBorder": "#FFF",
     "imageBorder": "0",
+    "boxBorderRadius": "0",
     "imageBorderColor": "#000",
     "prependZeros": false,
+    "boxSpacing": 0.2,
     "animation": true,
     "abbreviate": false,
     "fastest": true,
+    "fastestIcon": "🔥",
     "slowest": true,
+    "slowestIcon": "⌛️",
     'odometerUp': 'null',
     'odometerDown': 'null',
     'odometerSpeed': 2,
@@ -90,7 +156,6 @@ let data = {
     "hideSettings": 'q',
     'offlineGains': false,
     'lastOnline': new Date().getTime(),
-    'visulization': 'default',
     'max': 50,
     'autosave': true,
     'pause': false,
@@ -98,6 +163,20 @@ let data = {
     'auditStats': [0, 0, 0, 0],
     "hideSettings": 'q',
     "allowNegative": false,
+    "randomCountUpdateTime": false,
+    "waterFallCountUpdateTime": false,
+    "verticallyCenterRanks": false,
+    "boxBGLength": "0",
+    "boxBGGain": "#f7f5fe",
+    "boxBGLose": "#f7f5fe",
+    'fireIcons': {
+        'enabled': false,
+        'type': 'gain',
+        'firePosition': 'above',
+        'fireBorderColor': '#000',
+        'fireBorderWidth': 0,
+        'created': []
+    },
     'apiUpdates': {
         'enabled': false,
         'url': '',
@@ -105,6 +184,7 @@ let data = {
         'method': 'GET',
         'body': {},
         'headers': {},
+        'custom': false,
         'maxChannelsPerFetch': 'one',
         'response': {
             'loop': 'data',
@@ -121,10 +201,11 @@ let data = {
                 'path': 'image',
             },
             'id': {
-                'enabled': true,
                 'path': 'id',
+                'IDIncludes': false
             }
         },
+        'forceUpdates': false
     }
 };
 let updateInterval;
@@ -132,46 +213,20 @@ let apiInterval;
 
 initLoad()
 function initLoad(redo) {
+    let storedData = localStorage.getItem("data") ? JSON.parse(localStorage.getItem("data")) : null;
+
     if (!redo) {
-        data = localStorage.getItem("data") ? JSON.parse(localStorage.getItem("data")) : data;
-    }
-    if (!data.apiUpdates) {
-        data.apiUpdates = {
-            'enabled': false,
-            'url': '',
-            'interval': 2000,
-            'method': 'GET',
-            'body': '',
-            'headers': '',
-            'maxChannelsPerFetch': 'one',
-            'response': {
-                'loop': 'data',
-                'name': {
-                    'enabled': true,
-                    'path': 'name',
-                },
-                'count': {
-                    'enabled': true,
-                    'path': 'count',
-                },
-                'image': {
-                    'enabled': true,
-                    'path': 'image',
-                },
-                'id': {
-                    'enabled': true,
-                    'path': 'id',
-                }
-            },
+        if (storedData) {
+            data = mergeWithExampleData(storedData, example_data);
+        } else {
+            data = example_data;
         }
     }
+
     if (data.apiUpdates.enabled) {
         apiInterval = setInterval(function () {
             apiUpdate(true);
         }, parseFloat(data.apiUpdates.interval));
-    }
-    if (!data.theme) {
-        data.theme = 'top50';
     }
     if (data.theme.includes('top100')) {
         data.max = 100;
@@ -183,27 +238,10 @@ function initLoad(redo) {
         data.max = 10;
     } else if (data.theme.includes('top150')) {
         data.max = 150;
-    }
-    if ((!data.showImages) && (data.showImages !== false)) {
-        data.showImages = true;
-    }
-    if ((!data.showNames) && (data.showNames !== false)) {
-        data.showNames = true;
-    }
-    if ((!data.showCounts) && (data.showCounts !== false)) {
-        data.showCounts = true;
-    }
-    if ((!data.showRankings) && (data.showRankings !== false)) {
-        data.showRankings = true;
-    }
-    if (!data.imageBorderColor) {
-        data.imageBorderColor = '#000';
-    }
-    if (!data.order) {
-        data.order = 'desc';
+    } else if (data.theme.includes('top200')) {
+        data.max = 200;
     }
     data.pause = false;
-    data.visulization = 'default';
     if (data.lastOnline && data.offlineGains == true) {
         const interval = data.updateInterval / 1000;
         const secondsPassed = (new Date().getTime() - data.lastOnline) / 1000;
@@ -223,9 +261,7 @@ function initLoad(redo) {
     let design = setupDesign();
     document.getElementById('main').innerHTML = design[0].innerHTML;
     document.getElementById('main').style = design[1];
-    const style = document.createElement('style');
-    style.innerHTML = design[2];
-    document.getElementsByTagName('head')[0].appendChild(style);
+    //document.getElementById('designStyles').innerText = design[2];
     if (!data.uuid) {
         data.uuid = uuidGen();
     }
@@ -235,6 +271,19 @@ function initLoad(redo) {
     fix();
     updateOdo();
     updateInterval = setInterval(update, data.updateInterval);
+    if (data.theme.includes('A')) {
+        document.getElementById('main').style = "";
+        const container = document.getElementById("main");
+        iso = new Isotope(container, {
+            itemSelector: '.card',
+            layoutMode: 'fitRows',
+            getSortData: {
+                number: function (elem) {
+                    return parseInt(elem.getAttribute('data-subs')) || 0;
+                }
+            },
+        });
+    }
 }
 
 function setupDesign(list, sort, order) {
@@ -255,41 +304,87 @@ function setupDesign(list, sort, order) {
             channels = channels.reverse();
         }
     }
+
+    if ((data.theme.includes('top100')) || (data.theme.includes('top150'))) {
+        toReturn[2] = `.image { height: ${(data.showDifferences) ? 1.5 : 2.15}vw; width: ${(data.showDifferences) ? 1.5 : 2.15}vw; }
+        .card { height: 2.3vw; }
+        .count { font-size: ${(data.showDifferences) ? 0.7 : 1}vw; }
+        .name { font-size: ${(data.showDifferences) ? 0.5 : 0.75}vw; }
+        .subgap { font-size: 0.7vw;};`
+
+        data.cardStyles.imageSize = (data.showDifferences) ? 1.5 : 2.15;
+        data.cardStyles.cardHeight = '2.15'
+        data.cardStyles.countSize = (data.showDifferences) ? '0.7' : '1'
+        data.cardStyles.nameSize = (data.showDifferences) ? '0.5' : '0.75';
+        data.differenceStyles.differenceSize = '0.7vw';
+        toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
+
+    } else if (data.theme.includes('top200')) {
+        toReturn[2] = `.image { height: ${(data.showDifferences) ? 1.2 : 1.8}vw; width: ${(data.showDifferences) ? 1.2 : 1.8}vw; }
+        .card { height: 2vw; }
+        .count { font-size: ${(data.showDifferences) ? 0.6 : 0.9}vw; }
+        .name { font-size: ${(data.showDifferences) ? 0.4 : 0.6}vw; }
+        .subgap { font-size: 0.6vw; };`
+        toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
+
+        data.cardStyles.imageSize = (data.showDifferences) ? 1.2 : 1.8;
+        data.cardStyles.cardHeight = '1.8'
+        data.cardStyles.countSize = (data.showDifferences) ? '0.6' : '0.9'
+        data.cardStyles.nameSize = (data.showDifferences) ? '0.4' : '0.6';
+        data.differenceStyles.differenceSize = '0.6vw';
+    } else {
+        toReturn[2] = `.image { height: ${(data.showDifferences) ? 3 : 4.25}vw; width: ${(data.showDifferences) ? 3 : 4.25}vw; }
+        .card { height: 4.5vw; }
+        .count { font-size: ${(data.showDifferences) ? 1.4 : 2}vw; }
+        .name { font-size: ${(data.showDifferences) ? 1.05 : 1.5}vw; }
+        .subgap {font-size: 1.25vw;};`
+        toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(5, 1fr);";
+
+        data.cardStyles.imageSize = (data.showDifferences) ? 3 : 4.25;
+        data.cardStyles.cardHeight = '4.25'
+        data.cardStyles.countSize = (data.showDifferences) ? '1.4' : '2'
+        data.cardStyles.nameSize = (data.showDifferences) ? '1.05' : '1.5';
+        data.differenceStyles.differenceSize = '1.25vw';
+    }
+
     if (data.theme.includes('H')) {
         let cards = parseInt(data.theme.split('H')[0].split('top')[1]);
-        toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
-        if (cards == 100) {
-            toReturn[2] = `.image { height: 2.15vw; width: 2.15vw; }
-            .card { height: 2.15vw; }
-            .count { font-size: 1vw; }
-            .name { font-size: 0.75vw; }`;
-        } else if (cards == 150) {
-            toReturn[2] = `.image { height: 2.15vw; width: 2.15vw; }
-            .card { height: 2.15vw; }
-            .count { font-size: 1vw; }
-            .name { font-size: 0.75vw; }`;
-        } else {
-            toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(5, 1fr);";
+        toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(5, 1fr);";
+
+        if (cards > 50) {
+            toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
+            data.cardStyles.cardWidth = '9'
         }
+
         for (let l = 1; l <= cards; l++) {
             const cc = (c < 10) ? "0" + c : c;
             const dataIndex = c - 1;
-            let abbTest = `<div class="count odometer" id="count_${channels[dataIndex] ? channels[dataIndex].id : ''}">${Math.floor(channels[dataIndex] ? channels[dataIndex].count : 0)}</div>`;
-            if (data.abbreviate == true) {
-                abbTest = `<div class="count odometer" id="count_${channels[dataIndex] ? channels[dataIndex].id : ''}">${abb(Math.floor(channels[dataIndex] ? channels[dataIndex].count : 0))}</div>`;
-            }
-            const htmlcard = `<div class="card card_${dataIndex}" id="card_${channels[dataIndex] ? channels[dataIndex].id : ''}">
-                <div class="num" id="num_${channels[dataIndex] ? channels[dataIndex].id : ''}">${cc}</div>
-                <img src="${channels[dataIndex] ? channels[dataIndex].image : '../default.png'}" alt="" id="image_${channels[dataIndex] ? channels[dataIndex].id : ''}" class="image">
-                <div class="name" id="name_${channels[dataIndex] ? channels[dataIndex].id : ''}">${channels[dataIndex] ? channels[dataIndex].name : 'Loading'}</div>
-                ${abbTest}
+            const htmlcard = document.createElement('div');
+            const cid = channels[dataIndex] ? channels[dataIndex].id : '';
+            htmlcard.innerHTML = `<div class="card card_${dataIndex}" id="card_${cid}">
+                <div class="num" id="num_${cid}"><div class="num_text">${cc}</div></div>
+                <img src="../blank.png" alt="" id="image_${cid}" class="image">
+                <div>
+                    <div class="name" id="name_${cid}">Loading...</div>
+                    <div class="count odometer" id="count_${cid}">${getDisplayedCount(Math.floor(channels[dataIndex] ? channels[dataIndex].count : 0))}</div>
+                </div>
+                <img src="${data.differenceStyles.differenceImage}" class="gapimg">
+                <div class="subgap odometer"></div>
             </div>`;
+
+            if (channels[dataIndex]) {
+                if (htmlcard.querySelector('.image').src != channels[dataIndex].image) {
+                    htmlcard.querySelector('.image').src = channels[dataIndex].image || '../default.png'
+                }
+                htmlcard.querySelector('.name').innerText = channels[dataIndex].name || 'Loading...'
+            }
             c += 1;
-            main.innerHTML += htmlcard
+            main.innerHTML += htmlcard.innerHTML
         }
     } else {
         let columns = data.theme == 'top100' ? 10 : 5;
         columns = data.theme == 'top150' ? 10 : columns;
+        columns = data.theme == 'top200' ? 10 : columns;
         for (let l = 1; l <= columns; l++) {
             const htmlcolumn = document.createElement('div');
             htmlcolumn.classList = `column_${l} column`;
@@ -297,69 +392,61 @@ function setupDesign(list, sort, order) {
             for (let t = 1; t <= maxCards; t++) {
                 const cc = (c < 10) ? "0" + c : c;
                 const dataIndex = c - 1;
-                let abbTest = `<div class="count odometer" id="count_${channels[dataIndex] ? channels[dataIndex].id : ''}">${Math.floor(channels[dataIndex] ? channels[dataIndex].count : 0)}</div>`;
-                if (data.abbreviate == true) {
-                    abbTest = `<div class="count odometer" id="count_${channels[dataIndex] ? channels[dataIndex].id : ''}">${abb(Math.floor(channels[dataIndex] ? channels[dataIndex].count : 0))}</div>`;
-                }
-                const htmlcard = `<div class="card card_${dataIndex}" id="card_${channels[dataIndex] ? channels[dataIndex].id : ''}">
-                    <div class="num" id="num_${channels[dataIndex] ? channels[dataIndex].id : ''}">${cc}</div>
-                    <img src="${channels[dataIndex] ? channels[dataIndex].image : '../default.png'}" alt="" id="image_${channels[dataIndex] ? channels[dataIndex].id : ''}" class="image">
-                    <div class="name" id="name_${channels[dataIndex] ? channels[dataIndex].id : ''}">${channels[dataIndex] ? channels[dataIndex].name : 'Loading'}</div>
-                    ${abbTest}
+                const htmlcard = document.createElement('div');
+                const cid = channels[dataIndex] ? channels[dataIndex].id : '';
+                htmlcard.innerHTML = `<div class="card card_${dataIndex}" id="card_${cid}">
+                <div class="num" id="num_${cid}"><div class="num_text">${cc}</div></div>
+                <img src="../blank.png" alt="" id="image_${cid}" class="image">
+                <div>
+                    <div class="name" id="name_${cid}">Loading...</div>
+                    <div class="count odometer" id="count_${cid}">${getDisplayedCount(Math.floor(channels[dataIndex] ? channels[dataIndex].count : 0))}</div>
+                </div>
+                <img src="${data.differenceStyles.differenceImage}" class="gapimg">
+                <div class="subgap odometer"></div>
                 </div>`;
-                htmlcolumn.innerHTML += htmlcard;
+                if (channels[dataIndex]) {
+                    if (htmlcard.querySelector('.image').src != channels[dataIndex].image) {
+                        htmlcard.querySelector('.image').src = channels[dataIndex].image || '../default.png'
+                    }
+                    htmlcard.querySelector('.name').innerText = channels[dataIndex].name || 'Loading...'
+                }
+                htmlcolumn.innerHTML += htmlcard.innerHTML;
                 c += 1;
             }
             main.appendChild(htmlcolumn);
         }
-        if (data.theme == 'top100') {
-            toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
-            toReturn[2] = `.image { height: 2.15vw; width: 2.15vw; }
-            .card { height: 2.15vw; }
-            .count { font-size: 1vw; }
-            .name { font-size: 0.75vw; }`;
-        } else if (data.theme == 'top150') {
-            toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
-            toReturn[2] = `.image { height: 2.15vw; width: 2.15vw; }
-            .card { height: 2.15vw; }
-            .count { font-size: 1vw; }
-            .name { font-size: 0.75vw; }`;
-            toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(10, 1fr);";
-        } else {
-            toReturn[2] = `.image { height: 4.3vw; width: 4.3vw; }
-            .card { height: 4.3vw; }
-            .count { font-size: 2vw; }
-            .name { font-size: 1.5vw; }`;
-            toReturn[1] = "margin-top: 0px; display: grid; grid-template-columns: repeat(5, 1fr);";
-        }
     }
     toReturn[0] = main;
+    document.getElementById('theme').value = data.theme;
     return toReturn;
 }
 
+
 function create() {
-    const addMinGain = document.getElementById('add_min_gain').value;
-    const addMaxGain = document.getElementById('add_max_gain').value;
-    const addMeanGain = document.getElementById('add_mean_gain').value;
-    const addStdGain = document.getElementById('add_std_gain').value;
-    const addCount = document.getElementById('add_count').value;
-    const addName = document.getElementById('add_name').value;
-    const addImage1 = document.getElementById('add_image1').value;
-    const addImage2 = document.getElementById('add_image2');
-    if (addMinGain === '' || addMaxGain === '') {
-        alert('Please fill the minimum and maximum gain.');
-        return;
+    let addMinGain = document.getElementById('add_min_gain').value;
+    let addMaxGain = document.getElementById('add_max_gain').value;
+    let addMeanGain = document.getElementById('add_mean_gain').value;
+    let addStdGain = document.getElementById('add_std_gain').value;
+    let addCount = document.getElementById('add_count').value;
+    let addName = document.getElementById('add_name').value;
+    let addImage1 = document.getElementById('add_image1').value;
+    let addImage2 = document.getElementById('add_image2');
+    let addBgColor = document.getElementById('add_bg_color').value;
+    if (addMinGain === '') {
+        addMinGain = 0;
+    }
+    if (addMaxGain === '') {
+        addMaxGain = 0;
     }
     const min = parseFloat(addMinGain);
     const max = parseFloat(addMaxGain);
     let mean = parseFloat(addMeanGain);
     let std = parseFloat(addStdGain);
     if (!addCount) {
-        alert('Please enter a count value');
-        return;
-    } else if (!addName) {
-        alert('Please enter a name value');
-        return;
+        addCount = 0;
+    }
+    if (!addName) {
+        addName = "Untitled";
     }
     let image = '';
     if (!addImage1) {
@@ -399,42 +486,92 @@ function create() {
             std_gain: std,
             max_gain: max,
             id,
+            bg: addBgColor
         });
         fix();
     }
 }
 
-function update() {
+let appendedMDMStyles = false;
+
+function setupMDMStyles(undo) {
+    if (undo) {
+        appendedMDMStyles = false;
+        document.getElementById('mdm-styles').remove();
+        document.querySelectorAll('.num').forEach(item => {
+            item.style.backgroundImage = '';
+            item.style.border = '';
+        })
+        return;
+    }
+    let stylesToAppend = `<style id="mdm-styles">
+                        .card {
+                            display: grid;
+                            grid-template-columns: 1fr 2fr 5fr;
+                        }
+    
+                        .num {
+                            height: 100%;
+                            display: flex;
+                            ${data.verticallyCenterRanks ? 'flex-direction: column' : ''}
+                            align-items: center;
+                            border-radius: 5px;
+                            background-position: center;
+                            background-size: cover;
+                            font-size: 1.5em;
+                            margin-left: 0.1em;
+                        }
+
+                        .num_text {
+                            ${data.verticallyCenterRanks ? 'margin-top: 0.25em;' : 'margin-top: 0em;'}
+                            z-index: 1000;
+                            margin-left: 0.1em;
+                        }
+                            </style>`
+    document.body.insertAdjacentHTML('beforeend', stylesToAppend);
+    appendedMDMStyles = true;
+}
+
+function update(doGains = true) {
     let start = new Date().getTime();
     if (data) {
         let fastest = ""
-        let fastestCount = 0;
+        let fastestCount = -Infinity;
         let slowest = ""
-        let slowestCount = 0;
+        let slowestCount = Infinity;
         let past = document.getElementById('quickSelect').value;
         document.getElementById('quickSelect').innerHTML = "";
         let selections = ['<option value="select">Select</option>'];
         for (let i = 0; i < data.data.length; i++) {
+            if (!data.data[i]) {
+                data.data.splice(i, 1);
+                i--;
+                continue;
+            }
             selections.push('<option value="' + data.data[i].id + '">' + data.data[i].name + '</option>')
             data.data[i].lastCount = parseFloat(data.data[i].count);
             data.data[i].min_gain = parseFloat(data.data[i].min_gain);
             data.data[i].max_gain = parseFloat(data.data[i].max_gain);
             data.data[i].mean_gain = parseFloat(data.data[i].mean_gain);
             data.data[i].std_gain = parseFloat(data.data[i].std_gain);
-            if ((data.data[i].mean_gain && data.data[i].std_gain) && (data.data[i].mean_gain != 0) && (data.data[i].std_gain != 0)) {
-                data.data[i].count = parseFloat(data.data[i].count) + randomGaussian(parseFloat(data.data[i].mean_gain), parseFloat(data.data[i].std_gain))
-            } else {
-                data.data[i].count = parseFloat(data.data[i].count) + random(parseFloat(data.data[i].min_gain), parseFloat(data.data[i].max_gain));
+            if (doGains) {
+                if ((data.data[i].mean_gain && data.data[i].std_gain) && (data.data[i].mean_gain != 0) && (data.data[i].std_gain != 0)) {
+                    data.data[i].count = parseFloat(data.data[i].count) + randomGaussian(parseFloat(data.data[i].mean_gain), parseFloat(data.data[i].std_gain))
+                } else {
+                    data.data[i].count = parseFloat(data.data[i].count) + random(parseFloat(data.data[i].min_gain), parseFloat(data.data[i].max_gain));
+                }
             }
-            if ((data.data[i].count - data.data[i].lastCount > fastestCount) || (fastestCount == 0)) {
-                fastestCount = data.data[i].count - data.data[i].lastCount;
-                fastest = data.data[i].id;
+            if (data.data.length > 1) {
+                if ((data.data[i].count - data.data[i].lastCount >= fastestCount)) {
+                    fastestCount = data.data[i].count - data.data[i].lastCount;
+                    fastest = data.data[i].id;
+                }
+                if ((data.data[i].count - data.data[i].lastCount < slowestCount)) {
+                    slowestCount = data.data[i].count - data.data[i].lastCount;
+                    slowest = data.data[i].id;
+                }
             }
-            if ((data.data[i].count - data.data[i].lastCount < slowestCount) || (slowestCount == 0)) {
-                slowestCount = data.data[i].count - data.data[i].lastCount;
-                slowest = data.data[i].id;
-            }
-            if (nextUpdateAudit == true) {
+            if (nextUpdateAudit == true && doGains) {
                 let update = random(data.auditStats[0], data.auditStats[1])
                 data.data[i].count = data.data[i].count + update
             }
@@ -446,96 +583,285 @@ function update() {
                     data.data[i].count = 0;
                 }
             }
-            if (isNaN(data.data[i].count)) {
-                data.data[i].count == 0;
-            }
-            if (data.data[i].count == Infinity) {
-                data.data[i].count == 0;
+            if (!isFinite(data.data[i].count)) {
+                data.data[i].count = 0;
             }
         }
         document.getElementById('quickSelect').innerHTML = selections.join("");
-        document.getElementById('quickSelect').value = past;
-        if (document.getElementById('sorter').value == "fastest") {
-            data.data = data.data.sort(function (a, b) {
-                return avg(b.min_gain, b.max_gain) - avg(a.min_gain, a.max_gain)
-            });
-        } else if (document.getElementById('sorter').value == "name") {
-            data.data = data.data.sort(function (a, b) {
-                return a.name.localeCompare(b.name)
-            });
-        } else if ((!document.getElementById('sorter').value) || (document.getElementById('sorter').value == "num")) {
-            data.data = data.data.sort(function (a, b) {
-                return b.count - a.count
-            });
-        } else {
-            data.data = data.data.sort(function (a, b) {
-                return b.count - a.count
-            });
+        document.getElementById('quickSelect').value = past || 'select';
+        if (!data.theme.includes('A')) {
+            if (document.getElementById('sorter').value == "fastest") {
+                data.data = data.data.sort(function (a, b) {
+                    return avg(b.min_gain, b.max_gain) - avg(a.min_gain, a.max_gain)
+                });
+            } else if (document.getElementById('sorter').value == "name") {
+                data.data = data.data.sort(function (a, b) {
+                    return a.name.localeCompare(b.name)
+                });
+            } else if ((!document.getElementById('sorter').value) || (document.getElementById('sorter').value == "num")) {
+                data.data = data.data.sort(function (a, b) {
+                    return b.count - a.count
+                });
+            } else {
+                data.data = data.data.sort(function (a, b) {
+                    return b.count - a.count
+                });
+            }
         }
         if (document.getElementById('order').value == "asc") {
             data.data = data.data.reverse();
         }
-        if (data.visulization == 'default') {
+        if (!data.theme.includes('A')) {
+            if (data.fireIcons.enabled) {
+                if (data.fireIcons.firePosition == 'mdm') {
+                    if (!appendedMDMStyles) {
+                        setupMDMStyles();
+                    }
+                }
+            }
             for (let i = 0; i < data.max; i++) {
-                if ((i + 1) < 10) {
-                    num = "0" + (i + 1);
-                } else {
-                    num = (i + 1);
+                let extraTimeTillUpdate = 0;
+                const interval = data.updateInterval;
+                if (data.randomCountUpdateTime == true) {
+                    extraTimeTillUpdate = random(0, interval);
+                    //console.log('Extra time till update: ' + extraTimeTillUpdate);
                 }
-                if (document.getElementsByClassName("card")[i]) {
-                    if (data.data[i]) {
-                        if (!data.data[i].image) {
-                            data.data[i].image = "../default.png";
-                        }
-                        document.getElementsByClassName("card")[i].children[1].src = data.data[i].image
-                        document.getElementsByClassName("card")[i].children[2].innerHTML = data.data[i].name
-                        document.getElementsByClassName("card")[i].children[1].id = "image_" + data.data[i].id
-                        document.getElementsByClassName("card")[i].children[2].id = "name_" + data.data[i].id
-                        document.getElementsByClassName("card")[i].children[0].id = "num_" + data.data[i].id
-                        document.getElementsByClassName("card")[i].id = "card_" + data.data[i].id
-                        document.getElementsByClassName("card")[i].children[3].id = "count_" + data.data[i].id
-                        if (data.abbreviate == true) {
-                            document.getElementsByClassName("card")[i].children[3].innerHTML = abb(data.data[i].count)
-                        } else {
-                            document.getElementsByClassName("card")[i].children[3].innerHTML = Math.floor(data.data[i].count)
-                        }
-                        if (selected == data.data[i].id) {
-                            document.getElementById("card_" + selected).style.border = "0.1em solid red";
-                        } else {
-                            document.getElementById("card_" + data.data[i].id).style.border = "0.1em solid " + data.boxBorder + "";
-                        }
-                        if (fastest == data.data[i].id) {
-                            if (data.fastest == true) {
-                                document.getElementById("card_" + fastest).children[2].innerHTML = "🔥" + data.data[i].name
+                if (data.waterFallCountUpdateTime == true) {
+                    extraTimeTillUpdate = i * 100;
+                }
+                setTimeout(function () {
+                    if ((i + 1) < 10) {
+                        num = "0" + (i + 1);
+                    } else {
+                        num = (i + 1);
+                    }
+                    const currentCard = document.getElementsByClassName("card")[i]
+                    if (currentCard) {
+                        if (data.data[i]) {
+                            if (!data.data[i].image) {
+                                data.data[i].image = "../default.png";
                             }
-                        }
-                        if (slowest == data.data[i].id) {
-                            if (data.slowest == true) {
-                                document.getElementById("card_" + slowest).children[2].innerHTML = "⌛️" + data.data[i].name
+                            if ((data.data[i].bg) && (boxBGLength !== '1')) {
+                                currentCard.style.backgroundColor = data.data[i].bg;
+                            } else {
+                                currentCard.style.backgroundColor = data.boxColor;
                             }
+                            currentCard.id = "card_" + data.data[i].id
+                            currentCard.children[0].id = "num_" + data.data[i].id
+
+                            if (currentCard.children[1].src != data.data[i].image) {
+                                currentCard.children[1].src = data.data[i].image
+                            }
+                            currentCard.children[1].id = "image_" + data.data[i].id
+
+                            currentCard.children[2].children[0].innerText = data.data[i].name
+                            currentCard.children[2].children[0].id = "name_" + data.data[i].id
+
+                            currentCard.children[2].children[1].id = "count_" + data.data[i].id
+                            currentCard.children[2].children[1].innerText = getDisplayedCount(data.data[i].count)
+                            if (data.data[i + 1]) {
+                                if (data.data[i].count - data.data[i + 1].count < parseInt(data.differenceThreshold)) {
+                                    currentCard.children[4].innerText = getDisplayedCount(data.data[i].count) - getDisplayedCount(data.data[i + 1].count)
+                                    currentCard.children[4].style.visibility = 'visible'
+                                    currentCard.children[3].style.visibility = 'visible'
+                                } else {
+                                    currentCard.children[3].style.visibility = 'hidden'
+                                    currentCard.children[4].style.visibility = 'hidden'
+                                }
+                            } else {
+                                currentCard.children[4].style.visibility = 'hidden'
+                                currentCard.children[3].style.visibility = 'hidden'
+                            }
+                            if (selected == data.data[i].id) {
+                                document.getElementById("card_" + selected).style.border = "0.1em solid red";
+                            } else {
+                                document.getElementById("card_" + data.data[i].id).style.border = "0.1em solid " + data.boxBorder + "";
+                            }
+                            if (fastest == data.data[i].id) {
+                                if (data.fastest == true) {
+                                    document.getElementById("card_" + fastest).children[2].children[0].innerText = "" + data.fastestIcon + " " + data.data[i].name
+                                }
+                            }
+                            if (slowest == data.data[i].id) {
+                                if (data.slowest == true) {
+                                    document.getElementById("card_" + slowest).children[2].children[0].innerText = "" + data.slowestIcon + " " + data.data[i].name
+                                }
+                            }
+                            if (data.fireIcons.enabled) {
+                                let firePosition = data.fireIcons.firePosition;
+                                if (firePosition == 'before' || firePosition == 'after') {
+                                    document.getElementById("styles").innerHTML = `.num { display: flex; }`;
+                                } else {
+                                    document.getElementById("styles").innerHTML = ``;
+                                }
+                                for (let q = 0; q < data.fireIcons.created.length; q++) {
+                                    let equation = false;
+                                    //either gain or total
+                                    if (data.fireIcons.type == 'total') {
+                                        if (data.fireIcons.created[q].method == '>=') {
+                                            if (data.data[i].count >= data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        } else if (data.fireIcons.created[q].method == '==') {
+                                            if (data.data[i].count == data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        } else if (data.fireIcons.created[q].method == '<=') {
+                                            if (data.data[i].count <= data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        } else {
+                                            if (data.data[i].count != data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        }
+                                    } else if (data.fireIcons.type == 'gain') {
+                                        if (data.fireIcons.created[q].method == '>=') {
+                                            if ((data.data[i].count - data.data[i].lastCount) >= data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        } else if (data.fireIcons.created[q].method == '==') {
+                                            if ((data.data[i].count - data.data[i].lastCount) == data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        } else if (data.fireIcons.created[q].method == '<=') {
+                                            if ((data.data[i].count - data.data[i].lastCount) <= data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        } else {
+                                            if ((data.data[i].count - data.data[i].lastCount) != data.fireIcons.created[q].threshold) {
+                                                equation = true;
+                                            }
+                                        }
+                                    } else if (data.fireIcons.type == 'hour') {
+                                        let subs = data.data[i].count - data.data[i].lastCount;  // Correct: track new gains
+
+                                        let updateInterval = data.updateInterval / 1000;  // Convert ms to seconds
+                                        let updatesPerHour = 3600 / updateInterval;  // Calculate how many updates happen in an hour
+
+                                        let subsPerUpdateThreshold = data.fireIcons.created[q].threshold / updatesPerHour;  // Correct scaling
+
+                                        if (data.fireIcons.created[q].method == '>=') {
+                                            equation = subs >= subsPerUpdateThreshold;
+                                        } else if (data.fireIcons.created[q].method == '==') {
+                                            equation = subs == subsPerUpdateThreshold;
+                                        } else if (data.fireIcons.created[q].method == '<=') {
+                                            equation = subs <= subsPerUpdateThreshold;
+                                        } else {
+                                            equation = subs != subsPerUpdateThreshold;
+                                        }
+                                    }
+
+                                    if (equation) {
+                                        let icon = data.fireIcons.created[q].icon;
+                                        let fire = document.createElement('img');
+                                        fire.classList = 'fireIcon';
+                                        fire.style = `height: 1.5vw; width: 1.5vw;
+                                        border: solid ${escapeHTML(data.fireIcons.fireBorderWidth)}px ${escapeHTML(data.fireIcons.fireBorderColor)};`;
+                                        fire.src = escapeHTML(icon);
+                                        if (firePosition == 'replace') {
+                                            currentCard.children[0].innerHTML = fire.outerHTML;
+                                        } else if (firePosition == 'before') {
+                                            currentCard.children[0].innerHTML = fire.outerHTML + `<div class="num_text">${num}</div>`;
+                                        } else if (firePosition == 'after') {
+                                            currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>` + fire.outerHTML;
+                                        } else if (firePosition == 'above') {
+                                            currentCard.children[0].innerHTML = fire.outerHTML + `<br><div class="num_text">${num}</div>`;
+                                        } else if (firePosition == 'below') {
+                                            currentCard.children[0].innerHTML = `<div class="num_text">${num}</div><br>` + fire.outerHTML;
+                                        } else if (firePosition == 'left') {
+                                            if (!currentCard.children[2].children[0].innerHTML.includes('<img class="fireIcon"')) {
+                                                currentCard.children[2].children[0].innerHTML = fire.outerHTML + currentCard.children[2].children[0].innerHTML;
+                                                currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                                            }
+                                        } else if (firePosition == 'right') {
+                                            if (!currentCard.children[2].children[0].innerHTML.includes('<img class="fireIcon"')) {
+                                                currentCard.children[2].children[0].innerHTML = currentCard.children[2].children[0].innerHTML + fire.outerHTML;
+                                                currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                                            }
+                                        } else if (firePosition == 'replaceName') {
+                                            currentCard.children[2].children[0].innerHTML = fire.outerHTML;
+                                            currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                                        } else if (firePosition == 'mdm') {
+                                            currentCard.children[0].style.color = `${data.fireIcons.created[q].color}`;
+                                            currentCard.children[0].style.border = `solid ${data.fireIcons.fireBorderColor} ${data.fireIcons.fireBorderWidth}px`
+                                            currentCard.children[0].style.backgroundImage = `url(${escapeHTML(icon)})`;
+                                            currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                                        } else {
+                                            currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                                        }
+                                        break;
+                                    } else {
+                                        currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                                        if (firePosition == 'mdm') {
+                                            currentCard.children[0].style.backgroundImage = `url('')`;
+                                            currentCard.children[0].style.color = `${data.textColor}`;
+                                        }
+                                    }
+                                }
+                            } else {
+                                currentCard.children[0].innerHTML = `<div class="num_text">${num}</div>`;
+                            }
+                            if (data.boxBGLength !== '0') {
+                                if (data.data[i].count > data.data[i].lastCount) {
+                                    currentCard.style.backgroundColor = `${data.boxBGGain}`;
+                                } else if (data.data[i].count < data.data[i].lastCount) {
+                                    currentCard.style.backgroundColor = `${data.boxBGLose}`;
+                                }
+                                let user = data.data[i]
+                                setTimeout(function (currentCard, user) {
+                                    let bgColor = user.bg ? user.bg : data.boxColor;
+                                    currentCard.style.backgroundColor = bgColor;
+                                }, parseInt(data.boxBGLength * 1000), currentCard, user);
+                            }
+                        } else {
+                            currentCard.id = 'card_'
+                            currentCard.children[0].id = "num_"
+                            currentCard.children[1].id = "image_"
+                            currentCard.children[1].src = "../blank.png"
+                            currentCard.children[2].children[0].id = "name_"
+                            currentCard.children[2].children[0].innerText = 'Loading...'
+                            currentCard.children[2].children[1].id = "count_"
+                            currentCard.children[2].children[1].innerText = '0'
+                            currentCard.children[4].children[0].innerText = '0'
                         }
                     }
-                }
+                }, extraTimeTillUpdate);
             }
-        }
-        for (let q = 0; q < popups.length; q++) {
-            if ((!popups[q].popup) || (!popups[q].popup.document)) {
-                popups.splice(q, 1);
-            } else {
-                if (popups[q].specificChannels == true) {
-                    let data2 = [];
-                    for (let i = 0; i < data.data.length; i++) {
-                        for (let a = 0; a < popups[q].channels.length; a++) {
-                            if (popups[q].channels[a].id == data.data[i].id) {
-                                data2.push(data.data[i])
-                            }
-                        }
-                    }
-                    popups[q].popup.document.write('<data id="channels" style="display: none;">' + JSON.stringify(data2) + '</data>')
+        } else {
+            for (let i = 0; i < data.max; i++) {
+                let value = data.data[i];
+                let element = $(`.card_${i}`);
+                element.attr('data-subs', value.count);
+                if (element.length == 0) { }
+                element.find('.name').text(value.name);
+                element.find('.image').attr('src', value.image);
+                element.find('.count').text(getDisplayedCount(value.count));
+                if (selected == value.id) {
+                    element.css('border', '0.1em solid red');
                 } else {
-                    popups[q].popup.document.write('<data id="channels" style="display: none;">' + JSON.stringify(data.data) + '</data>')
+                    element.css('border', '0.1em solid ' + data.boxBorder + '');
                 }
+                if (fastest == value.id) {
+                    if (data.fastest == true) {
+                        element.find('.name').text("" + data.fastestIcon + " " + value.name);
+                    }
+                }
+                if (slowest == value.id) {
+                    if (data.slowest == true) {
+                        element.find('.name').text("" + data.slowestIcon + " " + value.name);
+                    }
+                }
+                /*try {
+                    element.find('.subgap').text(getDisplayedCount(value.count - filteredData[ids[i + 1]].count));
+                } catch (e) { }*/
             }
+
+            iso.updateSortData();
+            iso.arrange({
+                sortBy: 'number',
+                sortAscending: false
+            })
         }
     }
     let end = new Date().getTime();
@@ -544,8 +870,18 @@ function update() {
 }
 
 let selected = null;
-document.getElementById('main').addEventListener('click', function (e) {
-    selecterFunction(e)
+document.getElementById('quickSelectButton').addEventListener('click', function (e) {
+    if (!pickingChannels) {
+        if (quickSelecting) {
+            quickSelecting = false;
+            document.getElementById('quickSelectButton').style.border = ""
+            document.getElementById('main').removeEventListener('click', selectorFunction, { once: true })
+        } else {
+            quickSelecting = true;
+            document.getElementById('quickSelectButton').style.border = "solid 0.2em green"
+            document.getElementById('main').addEventListener('click', selectorFunction, { once: true })
+        }
+    }
 })
 
 document.getElementById('order').addEventListener('change', function (e) {
@@ -563,7 +899,11 @@ document.getElementById('quickSelect').addEventListener('change', function (e) {
         let newForm = {
             target: { id: "image_" + document.getElementById('quickSelect').value }
         }
-        selecterFunction(newForm)
+        selectorFunction(newForm)
+    } else {
+        selectorFunction({
+            target: { id: null }
+        })
     }
 })
 
@@ -619,8 +959,8 @@ function edit() {
                 }
             }
             if (document.getElementById('edit_name_check').checked) {
-                if (card.querySelector('.name').innerHTML !== name && name !== "") {
-                    card.querySelector('.name').innerHTML = name;
+                if (card.querySelector('.name').innerText !== name && name !== "") {
+                    card.querySelector('.name').innerText = name;
                     for (let i = 0; i < data.data.length; i++) {
                         if (data.data[i].id == id) {
                             data.data[i].name = name;
@@ -628,9 +968,16 @@ function edit() {
                     }
                 }
             }
+            if (document.getElementById('edit_bg_color_check').checked) {
+                for (let i = 0; i < data.data.length; i++) {
+                    if (data.data[i].id == id) {
+                        data.data[i].bg = document.getElementById('edit_bg_color').value;
+                    }
+                }
+            }
             if (document.getElementById('edit_count_check').checked) {
-                if (card.querySelector('.odometer').innerHTML !== count && count !== "") {
-                    card.querySelector('.odometer').innerHTML = count;
+                if (card.querySelector('.odometer').innerText !== count && count !== "") {
+                    card.querySelector('.odometer').innerText = getDisplayedCount(count);
                     for (let i = 0; i < data.data.length; i++) {
                         if (data.data[i].id == id) {
                             data.data[i].count = count;
@@ -653,20 +1000,38 @@ function edit() {
 }
 
 function save() {
-    localStorage.setItem("data", JSON.stringify(data));
-    alert("Saved!");
+    try {
+        localStorage.setItem("data", JSON.stringify(data));
+        document.getElementById("storage-warning").style.display = "none";
+        alert("Saved!");
+    } catch (error) {
+        alert(`Error: ${error}`)
+        document.getElementById("storage-warning").style.display = "block";
+    }
 }
 
 function saveData2() {
-    localStorage.setItem("data", JSON.stringify(data));
+    try {
+        localStorage.setItem("data", JSON.stringify(data));
+        document.getElementById("storage-warning").style.display = "none";
+    } catch (error) {
+        console.error(error);
+        document.getElementById("storage-warning").style.display = "block";
+    }
 }
 
 document.getElementById('loadData1').addEventListener('change', function () {
-    load();
+    let confirmed = confirm('Are you sure you want to import a new save? Your current data will be erased')
+    if (confirmed) {
+        load();
+    }
 });
 
 document.getElementById('loadData2').addEventListener('change', function () {
-    load1();
+    let confirmed = confirm('Are you sure you want to import a new save? Your current data will be erased')
+    if (confirmed) {
+        load1();
+    }
 });
 
 function load1() {
@@ -679,81 +1044,64 @@ function load1() {
 
 function load() {
     var data3 = {};
-    document.getElementById('main').innerHTML = "";
     if (document.getElementById('loadData1').files[0]) {
         document.getElementById('loadData1').files[0].text().then(function (data2) {
             data3 = JSON.parse(data2);
             if (data3.data) {
+                clearInterval(updateInterval);
+                clearInterval(auditTimeout);
                 data = JSON.parse(data2);
-                for (let i = 0; i < data.data.length; i++) {
-                    let id = data.data[i].id;
-                    let image = data.data[i].image;
-                    let name = data.data[i].name;
-                    let count = data.data[i].count;
-                    if (currentIndex < 10) {
-                        num = "0" + (currentIndex).toString();
-                    } else {
-                        num = currentIndex;
-                    }
-                    let card = document.createElement('div');
-                    card.className = "card";
-                    card.id = "card_" + currentIndex;
-                    card.setAttribute("cid", id);
-                    let div = document.createElement('div');
-                    div.className = "num";
-                    div.id = "num_" + currentIndex;
-                    div.innerHTML = num;
-                    div.setAttribute("cid", id);
-                    let img = document.createElement('img');
-                    img.className = "img";
-                    img.id = "img_" + currentIndex;
-                    img.src = image;
-                    img.setAttribute("cid", id);
-                    let nameDiv = document.createElement('h1');
-                    nameDiv.className = "name";
-                    nameDiv.id = "name_" + currentIndex;
-                    nameDiv.innerHTML = name;
-                    nameDiv.setAttribute("cid", id);
-                    let countDiv = document.createElement('h2');
-                    countDiv.classList = "odometer";
-                    countDiv.id = "count_" + currentIndex;
-                    countDiv.innerHTML = count;
-                    countDiv.setAttribute("cid", id);
-                    odo = new Odometer({
-                        el: countDiv
-                    });
-                    card.appendChild(div);
-                    card.appendChild(img);
-                    card.appendChild(nameDiv);
-                    card.appendChild(countDiv);
-                    document.getElementById('main').appendChild(card);
-                    currentIndex++;
-                }
-                document.body.style.backgroundColor = data.bgColor;
-                document.body.style.color = data.textColor;
-                adjustColors();
                 if (!data.uuid) {
                     data.uuid = uuidGen();
                 }
-                localStorage.setItem("data", JSON.stringify(data));
-                location.reload();
+                try {
+                    localStorage.setItem("data", JSON.stringify(data));
+                } catch (error) {
+                    console.error(error);
+                }
+                document.getElementById('main').innerHTML = "";
+                initLoad('redo')
             }
         });
+    } else {
+        alert('No save file found!')
     }
 }
-function save2() {
-    let data2 = JSON.stringify(data);
-    let a = document.createElement('a');
-    let file = new Blob([data2], { type: 'text/json' });
-    a.href = URL.createObjectURL(file);
-    a.download = 'data.json';
-    a.click();
+function save2(public = false) {
+    let data2;
+    if (public) {
+        data2 = structuredClone(data);
+        data2.apiUpdates.enabled = false;
+        data2.apiUpdates.url = '';
+        data2.apiUpdates.body = Object.create(null);
+        data2.apiUpdates.headers = Object.create(null);
+        data2.uuid = null;
+    } else {
+        data2 = data;
+    }
+    if (public || confirm("PLEASE READ: You are exporting a private save file. This means that the save file will include things like any API keys you have put in. If you do not wish for this data to be in your save file, export a public save that is safe to share publicly instead. Be sure to NEVER share the private save file with anyone you do not trust!")) {
+        let data3 = JSON.stringify(data2);
+        let a = document.createElement('a');
+        let file = new Blob([data3], { type: 'text/json' });
+        a.href = URL.createObjectURL(file);
+        a.download = public ? 'data.json' : 'data-PRIVATE.json';
+        a.click();
+    }
 }
 
 function reset() {
     if (confirm("Are you sure you want to reset?")) {
-        localStorage.clear();
+        localStorage.removeItem("data");
         location.reload();
+    }
+}
+
+function zero() {
+    if (confirm("Are you sure you want to zero all the counters?")) {
+        for (i = 0; i < data.data.length; i++) {
+            data.data[i].count = 0;
+        }
+        update(false)
     }
 }
 
@@ -761,18 +1109,14 @@ function deleteChannel() {
     if (selected !== null) {
         if (confirm("Are you sure you want to delete this channel?")) {
             let id = selected;
-            let image = document.getElementById('image_' + id).src = "../default.png"
-            let name = document.getElementById('name_' + id).innerHTML = "Loading";
-            let count = document.getElementById('count_' + id).innerHTML = "0";
-            name.innerHTML = "";
-            count.innerHTML = "";
-            image.src = "";
             for (let i = 0; i < data.data.length; i++) {
                 if (data.data[i].id == id) {
                     data.data.splice(i, 1);
                 }
             }
             selected = null;
+            document.getElementById('quickSelect').value = 'select';
+            refresh()
         }
     } else {
         alert("Please select a card by clicking it.");
@@ -803,9 +1147,55 @@ document.getElementById('backPicker').addEventListener('change', function () {
     adjustColors();
 });
 
+document.getElementById('boxSpacing').addEventListener('change', function () {
+    document.getElementById('main').children = Array.from(document.getElementById('main').children).forEach(child => {
+        Array.from(child.children).forEach(child2 => {
+            child2.style.margin = this.value + 'vw';
+        });
+    });
+
+    data.boxSpacing = this.value;
+    adjustColors();
+});
+
 document.getElementById('textPicker').addEventListener('change', function () {
     document.getElementById('main').style.color = this.value;
     data.textColor = this.value;
+});
+
+document.getElementById('rankSize').addEventListener('change', function () {
+    data.cardStyles.rankSize = this.value;
+    fix();
+});
+
+document.getElementById('differenceSize').addEventListener('change', function () {
+    data.differenceStyles.differenceSize = this.value;
+    fix();
+});
+
+document.getElementById('cardWidth').addEventListener('change', function () {
+    data.cardStyles.cardWidth = this.value;
+    fix();
+});
+
+document.getElementById('cardHeight').addEventListener('change', function () {
+    data.cardStyles.cardHeight = this.value;
+    fix();
+});
+
+document.getElementById('imageSize').addEventListener('change', function () {
+    data.cardStyles.imageSize = this.value;
+    fix();
+});
+
+document.getElementById('nameSize').addEventListener('change', function () {
+    data.cardStyles.nameSize = this.value;
+    fix();
+});
+
+document.getElementById('countSize').addEventListener('change', function () {
+    data.cardStyles.countSize = this.value;
+    fix();
 });
 
 document.getElementById('boxPicker').addEventListener('change', function () {
@@ -828,15 +1218,37 @@ document.getElementById('allowNegative').addEventListener('change', function () 
     }
 });
 
+document.getElementById('randomCountUpdateTime').addEventListener('change', function () {
+    if (this.checked) {
+        data.randomCountUpdateTime = true;
+    } else {
+        data.randomCountUpdateTime = false;
+    }
+});
+
+document.getElementById('waterFallCountUpdateTime').addEventListener('change', function () {
+    if (this.checked) {
+        data.waterFallCountUpdateTime = true;
+    } else {
+        data.waterFallCountUpdateTime = false;
+    }
+});
+
 document.getElementById('imageBorder').addEventListener('change', function () {
     let num = this.value;
     data.imageBorder = num;
     fix()
 });
 
-document.getElementById('imageBorder').addEventListener('change', function () {
+document.getElementById('imageBorderColor').addEventListener('change', function () {
     let color = this.value;
     data.imageBorderColor = color;
+    fix()
+});
+
+document.getElementById('boxBorderRadius').addEventListener('change', function () {
+    let num = this.value;
+    data.boxBorderRadius = num;
     fix()
 });
 
@@ -849,12 +1261,111 @@ document.getElementById('prependZeros').addEventListener('change', function () {
     fix()
 });
 
-document.getElementById('showRankings').addEventListener('change', function () {
-    if (document.getElementById('showRankings').checked) {
-        data.showRankings = true;
+document.getElementById('showBlankSlots').addEventListener('change', function () {
+    if (document.getElementById('showBlankSlots').checked) {
+        data.showBlankSlots = true;
     } else {
-        data.showRankings = false;
+        data.showBlankSlots = false;
     }
+    fix()
+});
+
+document.getElementById('verticallyCenterRanks').addEventListener('change', function () {
+    if (document.getElementById('verticallyCenterRanks').checked) {
+        data.verticallyCenterRanks = true;
+    } else {
+        data.verticallyCenterRanks = false;
+    }
+    fix();
+});
+
+document.getElementById('topDifferencePlacing').addEventListener('change', function () {
+    data.differenceStyles.top = document.getElementById('topDifferencePlacing').value;
+    fix();
+});
+
+document.getElementById('leftDifferencePlacing').addEventListener('change', function () {
+    data.differenceStyles.left = document.getElementById('leftDifferencePlacing').value;
+    fix();
+});
+
+document.getElementById('differenceThreshold').addEventListener('change', function () {
+    data.differenceThreshold = document.getElementById('differenceThreshold').value;
+    fix();
+});
+
+document.getElementById('enableImageShakes').addEventListener('change', function () {
+    data.differenceStyles.shakingEnabled = document.getElementById('enableImageShakes').checked;
+    fix();
+});
+
+document.getElementById('differenceColor').addEventListener('change', function () {
+    data.differenceStyles.color = document.getElementById('differenceColor').value;
+    fix();
+});
+
+document.getElementById('enableDifferenceImages').addEventListener('change', function () {
+    data.differenceStyles.imageEnabled = document.getElementById('enableDifferenceImages').checked;
+    fix();
+});
+
+document.getElementById('leftDifferenceImagePlacing').addEventListener('change', function () {
+    data.differenceStyles.imageLeft = document.getElementById('leftDifferenceImagePlacing').value;
+    fix();
+});
+
+document.getElementById('topDifferenceImagePlacing').addEventListener('change', function () {
+    data.differenceStyles.imageTop = document.getElementById('topDifferenceImagePlacing').value;
+    fix();
+});
+
+document.getElementById('differenceImageSize').addEventListener('change', function () {
+    data.differenceStyles.imageSize = document.getElementById('differenceImageSize').value;
+    fix();
+});
+
+document.getElementById('differenceImageUrl').addEventListener('change', function () {
+    data.differenceStyles.differenceImage = document.getElementById('differenceImageUrl').value;
+    document.querySelectorAll('.gapimg').forEach(item => {
+        item.src = data.differenceStyles.differenceImage;
+    });
+});
+
+function saveImageForDiffs() {
+    let image = document.getElementById('differenceImageFile').files[0];
+    if (image) {
+        let url = URL.createObjectURL(image);
+        let reader = new FileReader();
+        reader.onload = function (e) {
+            let base64 = e.target.result;
+            data.differenceStyles.differenceImage = base64;
+            document.getElementById('differenceImageFile').value = '';
+            document.querySelectorAll('.gapimg').forEach(item => {
+                item.src = base64;
+            });
+        };
+        reader.readAsDataURL(image);
+        URL.revokeObjectURL(url);
+    }
+};
+
+document.getElementById('showDifferences').addEventListener('change', function () {
+    if (document.getElementById('showDifferences').checked) {
+        data.showDifferences = true;
+    } else {
+        data.showDifferences = false;
+    }
+    fix()
+});
+
+document.getElementById('showRankings').addEventListener('change', function () {
+    data.showRankings = document.getElementById('showRankings').checked;
+    fix()
+});
+
+
+document.getElementById('rankingsWidth').addEventListener('change', function () {
+    data.rankingsWidth = document.getElementById('rankingsWidth').value;
     fix()
 });
 document.getElementById('showNames').addEventListener('change', function () {
@@ -884,7 +1395,7 @@ document.getElementById('showCounts').addEventListener('change', function () {
 
 function fix() {
     if (data.audits == true) {
-        auditTimeout = setTimeout(audit, (random(data.auditStats[2], data.auditStats[3])) * 1000)
+        auditTimeout = setTimeout(audit, (random(data.auditStats[2], data.auditStats[4])) * 1000)
     }
     document.getElementById('auditMin').value = data.auditStats[0]
     document.getElementById('auditMax').value = data.auditStats[1]
@@ -898,9 +1409,6 @@ function fix() {
     if ((!data.slowest) && (data.slowest !== false)) {
         data.slowest = true;
     }
-    if (!data.hideSettings) {
-        data.hideSettings = 'q';
-    }
     if (data.animation == true) {
         document.getElementById('animation').checked = true;
     } else {
@@ -910,6 +1418,16 @@ function fix() {
         document.getElementById('allowNegative').checked = true;
     } else {
         document.getElementById('allowNegative').checked = false;
+    }
+    if (data.randomCountUpdateTime == true) {
+        document.getElementById('randomCountUpdateTime').checked = true;
+    } else {
+        document.getElementById('randomCountUpdateTime').checked = false;
+    }
+    if (data.waterFallCountUpdateTime == true) {
+        document.getElementById('waterFallCountUpdateTime').checked = true;
+    } else {
+        document.getElementById('waterFallCountUpdateTime').checked = false;
     }
     if (data.fastest == true) {
         document.getElementById('fastest').checked = true;
@@ -948,6 +1466,86 @@ function fix() {
             card.style.display = "none";
         })
     }
+    if (data.showBlankSlots) {
+        document.getElementById('showBlankSlots').checked = true;
+        document.getElementById('hideBlanks').innerText = '';
+    } else {
+        document.getElementById('showBlankSlots').checked = false;
+        document.getElementById('hideBlanks').innerText = '#card_ * {display: none;}';
+    }
+
+    if (data.verticallyCenterRanks) {
+        document.getElementById('verticallyCenterRanks').checked = true;
+        document.getElementById("centerRanks").innerText = ".num { align-items: center; display: flex; };"
+    } else {
+        document.getElementById('verticallyCenterRanks').checked = false;
+        document.getElementById("centerRanks").innerText = "";
+    }
+
+    if (data.showDifferences) {
+        document.getElementById('showDifferences').checked = true;
+        document.getElementById('hideDifferences').innerText = '';
+    } else {
+        document.getElementById('showDifferences').checked = false;
+        document.getElementById('hideDifferences').innerText = '.subgap * {display: none;}';
+    }
+
+    document.getElementById('leftDifferencePlacing').value = data.differenceStyles.left;
+    document.getElementById('topDifferencePlacing').value = data.differenceStyles.top;
+    document.getElementById('differenceThreshold').value = data.differenceThreshold;
+    document.getElementById('differenceColor').value = data.differenceStyles.color;
+
+    document.getElementById('enableDifferenceImages').checked = data.differenceStyles.imageEnabled;
+    document.getElementById('leftDifferenceImagePlacing').value = data.differenceStyles.imageLeft;
+    document.getElementById('topDifferenceImagePlacing').value = data.differenceStyles.imageTop;
+    ;
+    document.getElementById('differenceImageSize').value = data.differenceStyles.imageSize;
+    document.getElementById('enableImageShakes').checked = data.differenceStyles.shakingEnabled;
+
+    if (!data.differenceStyles.differenceImage.startsWith('data:image')) {
+        document.getElementById('differenceImageUrl').value = data.differenceStyles.differenceImage;
+    }
+
+    document.getElementById('differenceStyling').innerText = `
+        .subgap {
+            top: ${data.differenceStyles.top}%;
+            z-index: 100;
+            position: absolute;
+            float: none;
+            left: ${data.differenceStyles.left}%;
+            font-size: ${data.differenceStyles.differenceSize}vw;
+        }
+
+        .subgap {
+            color: ${data.differenceStyles.color};
+        }
+
+        .gapimg {
+            width: ${data.differenceStyles.imageSize}px;
+            height: ${data.differenceStyles.imageSize}px;
+            ${data.differenceStyles.imageEnabled ? "" : "display: none"};
+            left: ${data.differenceStyles.imageLeft}%;
+            top: ${data.differenceStyles.imageTop}%;
+            ${data.differenceStyles.shakingEnabled ? "animation: shake 1s infinite;" : ""}
+        }`;
+
+    document.getElementById('cardStyles').innerText = `
+            .name {
+                font-size: ${data.cardStyles.nameSize}vw;
+            }
+            .count {
+                font-size: ${data.cardStyles.countSize}vw;
+            }
+            .image {
+                height: ${data.cardStyles.imageSize}vw;
+                width: ${data.cardStyles.imageSize}vw;
+            }
+            .card {
+                height: ${data.cardStyles.cardHeight}vw;
+                width: ${data.cardStyles.cardWidth}vw;
+            }
+        `
+
     if (data.prependZeros == true) {
         document.getElementById('prependZeros').checked = true;
         let index = 1;
@@ -955,16 +1553,16 @@ function fix() {
         if (totalNums < 100) {
             document.querySelectorAll('.num').forEach(function (card) {
                 if (index < 10) {
-                    card.innerHTML = "0" + index
+                    card.firstChild.innerText = "0" + index
                 }
                 index += 1;
             })
         } else {
             document.querySelectorAll('.num').forEach(function (card) {
                 if (index < 10) {
-                    card.innerHTML = "00" + index
+                    card.firstChild.innerText = "00" + index
                 } else if (index < 100) {
-                    card.innerHTML = "0" + index
+                    card.firstChild.innerText = "0" + index
                 }
                 index += 1;
             })
@@ -973,7 +1571,7 @@ function fix() {
         document.getElementById('prependZeros').checked = false;
         let index = 1;
         document.querySelectorAll('.num').forEach(function (card) {
-            card.innerHTML = index
+            card.firstChild.innerText = index
             index += 1;
         })
     }
@@ -1011,19 +1609,50 @@ function fix() {
         })
     }
 
-    document.getElementById('theme').value = data.theme;
-    document.getElementById('setting').innerHTML = "Current: " + data.hideSettings + ""
+    document.getElementById('setting').innerText = "Current: " + data.hideSettings + ""
     document.querySelectorAll('.card').forEach(function (card) {
         card.style.backgroundColor = data.boxColor;
         if (card.className.split(' ').includes("selected") == false) {
             card.style.border = "solid 0.1em " + data.boxBorder;
+        }
+        if (["top100", "top150", "top200", "top100H", "top150H", "top200H"].includes(data.theme)) {
+            card.style.borderRadius = (((parseFloat(data.boxBorderRadius) || 0) / 200) * 2.15) + "vw " + (((parseFloat(data.boxBorderRadius) || 0) / 200) * 2.15) + "vw";
+        } else {
+            card.style.borderRadius = (((parseFloat(data.boxBorderRadius) || 0) / 200) * 4.25) + "vw " + (((parseFloat(data.boxBorderRadius) || 0) / 200) * 4.25) + "vw";
         }
     });
     document.querySelectorAll('.image').forEach(function (card) {
         card.style.borderRadius = data.imageBorder + "%";
         card.style.borderColor = data.imageBorderColor;
     });
+    document.getElementById('main').children = Array.from(document.getElementById('main').children).forEach(child => {
+        if (data.theme.includes('H')) {
+            child.style.margin = data.boxSpacing + 'vw';
+        } else {
+            Array.from(child.children).forEach(child2 => {
+                child2.style.margin = data.boxSpacing + 'vw';
+            });
+        }
+    });
+    document.getElementById('rankSizeStyles').innerText = `
+        .num_text {
+        font-size: ${data.cardStyles.rankSize}px;
+        }
+
+        .num {
+          width: ${data.rankingsWidth}px;
+        }
+        
+        `;
     document.getElementById('backPicker').value = convert3letterhexto6letters(data.bgColor);
+    document.getElementById('boxSpacing').value = data.boxSpacing;
+    document.getElementById('rankSize').value = data.cardStyles.rankSize;
+    document.getElementById('differenceSize').value = data.differenceStyles.differenceSize;
+    document.getElementById('cardWidth').value = data.cardStyles.cardWidth;
+    document.getElementById('cardHeight').value = data.cardStyles.cardHeight;
+    document.getElementById('nameSize').value = data.cardStyles.nameSize;
+    document.getElementById('countSize').value = data.cardStyles.countSize;
+    document.getElementById('imageSize').value = data.cardStyles.imageSize;
     document.getElementById('textPicker').value = convert3letterhexto6letters(data.textColor);
     document.getElementById('boxPicker').value = convert3letterhexto6letters(data.boxColor);
     document.getElementById('borderPicker').value = convert3letterhexto6letters(data.boxBorder);
@@ -1032,17 +1661,27 @@ function fix() {
     document.getElementById('odometerSpeed').value = data.odometerSpeed;
     document.getElementById('imageBorder').value = data.imageBorder;
     document.getElementById('imageBorderColor').value = data.imageBorderColor;
+
+    document.getElementById('boxBGGain').value = data.boxBGGain;
+    document.getElementById('boxBGLose').value = data.boxBGLose;
+    document.getElementById('boxBGLength').value = data.boxBGLength;
+
+    document.getElementById('boxBorderRadius').value = data.boxBorderRadius;
+    document.getElementById('fastestIcon').value = data.fastestIcon || '🔥';
+    document.getElementById('slowestIcon').value = data.slowestIcon || '⌛️';
     if (data.updateInterval) {
         document.getElementById('updateint').value = (data.updateInterval / 1000).toString()
     }
-    $('style').append(`.odometer.odometer-auto-theme.odometer-animating-up.odometer-animating .odometer-ribbon-inner, .odometer.odometer-theme-default.odometer-animating-up.odometer-animating .odometer-ribbon-inner {
+    let odometerStyles = document.getElementById('odometerStyles')
+    odometerStyles.innerText = '';
+    odometerStyles.innerText += `.odometer.odometer-auto-theme.odometer-animating-up.odometer-animating .odometer-inside, .odometer.odometer-theme-default.odometer-animating-up.odometer-animating .odometer-inside {
         color: ${data.odometerUp};
-        }`)
-    $('style').append(`.odometer.odometer-auto-theme.odometer-animating-down.odometer-animating .odometer-ribbon-inner, .odometer.odometer-theme-default.odometer-animating-down.odometer-animating .odometer-ribbon-inner {
+        }`
+    odometerStyles.innerText += `.odometer.odometer-auto-theme.odometer-animating-down.odometer-animating .odometer-inside, .odometer.odometer-theme-default.odometer-animating-down.odometer-animating .odometer-ribbon-inner {
         color: ${data.odometerDown};
-        }`)
+        }`
 
-    $('style').append(`.odometer.odometer-auto-theme.odometer-animating-up .odometer-ribbon-inner,
+    odometerStyles.innerText += `.odometer.odometer-auto-theme.odometer-animating-up .odometer-ribbon-inner,
     .odometer.odometer-theme-default.odometer-animating-up .odometer-ribbon-inner {
         -webkit-transition: -webkit-transform ${data.odometerSpeed}s;
         -moz-transition: -moz-transform ${data.odometerSpeed}s;
@@ -1058,7 +1697,7 @@ function fix() {
         -ms-transition: -ms-transform ${data.odometerSpeed}s;
         -o-transition: -o-transform ${data.odometerSpeed}s;
         transition: transform ${data.odometerSpeed}s;
-    }`)
+    }`
 }
 
 function convert3letterhexto6letters(hex) {
@@ -1088,18 +1727,12 @@ function connect() {
 let update2Hold;
 if (connected == true) {
     update2()
-    update2Hold = setInterval(update2, 5000);
-    document.getElementById('isconnected').innerHTML = "Yes";
-    document.getElementById('toConnect').innerHTML = "Disconnect";
+    update2Hold = setInterval(update2, 2500);
+    document.getElementById('isconnected').innerText = "Yes";
+    document.getElementById('toConnect').innerText = "Disconnect";
 }
 
 function update2() {
-    if (!data.gain_min) {
-        data.gain_min = -10000;
-    }
-    if (!data.gain_max) {
-        data.gain_max = 10000;
-    }
     fetch('https://api.lcedit.com/' + code + '')
         .then(response => response.json())
         .then(json => {
@@ -1175,10 +1808,25 @@ function update2() {
                         }
                     }
                 }
+                if (json.system.length > 0) {
+                    for (let i = 0; i < json.system.length; i++) {
+                        if (json.system[i].type == "user") {
+                            let username = "";
+                            let set = 0;
+                            for (let a = 0; a < data.data.length; a++) {
+                                if (data.data[a].id == json.system[i].id) {
+                                    username = data.data[a].name;
+                                    set = data.data[a].count;
+                                }
+                            }
+                            fetch('https://api.lcedit.com/' + code + '/' + json.system[i].id + '/user?subs=' + set + '&name=' + username + '')
+                        }
+                    }
+                }
             } else {
                 alert("You are no longer connected.");
                 clearInterval(update2Hold);
-                document.getElementById('isconnected').innerHTML = "No";
+                document.getElementById('isconnected').innerText = "No";
                 fetch('https://api.lcedit.com/create?code=' + code + '', {
                     method: 'POST'
                 })
@@ -1245,12 +1893,14 @@ function custom() {
         alert("Please enter a number.")
         return;
     }
-    alert('$(urlfetch https://api.lcedit.com/' + code + '/$(userid)?values=' + min + ',' + max + ')')
+    let returnText = prompt("What should the commands response be? (use $(user) for the name and $(query) for any additional text)")
+    alert('$(urlfetch https://api.lcedit.com/' + code + '/$(userid)?values=' + min + ',' + max + '&returnText=' + returnText + ')')
 }
 
-document.getElementById('connect').value = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)/$(query))';
-document.getElementById('connect3').value = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)/$(query)?value=edit)';
-document.getElementById('connect2').value = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)?values=10,20)';
+document.getElementById('connect').innerHTML = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)/$(query)?returnText=Added $(user)!)';
+document.getElementById('connect2').innerHTML = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)?values=10,20&returnText=$(user) uploaded $(query)!)';
+document.getElementById('connect3').innerHTML = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)/$(query)?value=edit&returnText=Edited $(user)!)';
+document.getElementById('connect4').innerHTML = '$(urlfetch https://api.lcedit.com/' + code + '/$(userid)/user)';
 
 document.getElementById('animation').addEventListener('click', function (event) {
     if (event.target.checked) {
@@ -1262,73 +1912,12 @@ document.getElementById('animation').addEventListener('click', function (event) 
 })
 
 function updateOdo() {
-    if (data.animation == true) {
-        for (let i = 0; i < data.max; i++) {
-            if (document.getElementsByClassName("card")[i]) {
-                document.getElementsByClassName("card")[i].children[3].remove();
-                let div = document.createElement("div");
-                div.className = "count";
-                div.id = "count" + i;
-                if (data.data[i]) {
-                    if (data.data[i]) {
-                        div.innerHTML = data.data[i].count.toLocaleString();
-                    } else {
-                        div.innerHTML = 0;
-                    }
-                } else {
-                    div.innerHTML = 0;
-                }
-                document.getElementsByClassName("card")[i].appendChild(div);
-                let count = 0;
-                if (data.data[i]) {
-                    count = data.data[i].count;
-                } else {
-                    count = 0;
-                }
-                if (data.abbreviate == true) {
-                    if (data.data[i]) {
-                        count = abb(data.data[i].count);
-                    }
-                }
-                new Odometer({
-                    el: document.getElementById("count" + i),
-                    value: count,
-                    format: '(,ddd)',
-                    theme: 'default'
-                })
-            }
-        }
-    } else {
-        for (let i = 0; i < data.max; i++) {
-            if (document.getElementsByClassName("card")[i]) {
-                document.getElementsByClassName("card")[i].children[3].remove();
-                let div = document.createElement("div");
-                div.className = "count";
-                div.id = "count" + i;
-                if (data.data[i]) {
-                    div.innerHTML = data.data[i].count.toLocaleString();
-                } else {
-                    div.innerHTML = 0;
-                }
-                document.getElementsByClassName("card")[i].appendChild(div);
-                if (data.data[i]) {
-                    new Odometer({
-                        el: document.getElementById("count" + i),
-                        value: data.data[i].count,
-                        format: '(,ddd)',
-                        theme: 'default',
-                        animation: 'count'
-                    })
-                } else {
-                    new Odometer({
-                        el: document.getElementById("count" + i),
-                        value: 0,
-                        format: '(,ddd)',
-                        theme: 'default',
-                        animation: 'count'
-                    })
-                }
-            }
+    odometers = Odometer.init();
+    for (i = 0; i < odometers.length; i++) {
+        if (data.animation) {
+            delete odometers[i].options.animation
+        } else {
+            odometers[i].options.animation = 'count'
         }
     }
 }
@@ -1342,8 +1931,7 @@ document.getElementById('abbreviate').addEventListener('click', function () {
 })
 
 document.getElementById('theme').addEventListener('change', function () {
-    let theme = document.getElementById('theme').value;
-    data.theme = theme;
+    data.theme = document.getElementById('theme').value;
     themeChanger();
 })
 
@@ -1362,6 +1950,16 @@ document.getElementById('fastest').addEventListener('click', function () {
     } else {
         data.fastest = false;
     }
+})
+
+document.getElementById('fastestIcon').addEventListener('change', function () {
+    let icon = document.getElementById('fastestIcon').value;
+    data.fastestIcon = icon;
+})
+
+document.getElementById('slowestIcon').addEventListener('change', function () {
+    let icon = document.getElementById('slowestIcon').value;
+    data.slowestIcon = icon;
 })
 
 document.getElementById('slowest').addEventListener('click', function () {
@@ -1417,12 +2015,13 @@ function hideSettings() {
     document.addEventListener('keydown', function (e) {
         data.hideSettings = e.key;
         alert("Key set to " + e.key)
-        document.getElementById('setting').innerHTML = "Current: " + e.key + ""
+        document.getElementById('setting').innerText = "Current: " + e.key + ""
         this.removeEventListener('keydown', arguments.callee, false);
     })
 }
 
 document.addEventListener('keydown', function (e) {
+    if (e.target && e.target.tagName === 'INPUT') return;
     if (e.key == data.hideSettings) {
         if (document.getElementById('settings').style.display == "none") {
             document.getElementById('settings').style.display = "block";
@@ -1435,11 +2034,11 @@ document.addEventListener('keydown', function (e) {
 function pause() {
     if (data.pause == false) {
         data.pause = true;
-        document.getElementById('pauseB').innerHTML = "Resume"
+        document.getElementById('pauseB').innerText = "Resume"
         clearInterval(updateInterval);
     } else {
         data.pause = false;
-        document.getElementById('pauseB').innerHTML = "Pause"
+        document.getElementById('pauseB').innerText = "Pause"
         updateInterval = setInterval(update, data.updateInterval);
         update()
     }
@@ -1456,16 +2055,16 @@ function average(num1, num2) {
     return (num1 + num2) / 2
 }
 
-function create50dummychannels() {
-    for (let i = 0; i < 50; i++) {
-        data.data[i] = {
+function createDummyChannels(count, min, max) {
+    for (let i = 0; i < count; i++) {
+        data.data.push({
             name: "Channel " + i,
             count: Math.round(randomGaussian(1000, 100)),
-            min_gain: 1,
-            max_gain: 2,
+            min_gain: min,
+            max_gain: max,
             image: '../default.png',
             id: uuidGen()
-        }
+        })
     }
 }
 
@@ -1528,34 +2127,25 @@ function mean(a, b) {
 
 function audit() {
     nextUpdateAudit = true;
-    auditTimeout = setTimeout(audit, (random(data.auditStats[2], data.auditStats[3])) * 1000)
+    auditTimeout = setTimeout(audit, (random(data.auditStats[2], data.auditStats[4])) * 1000)
 }
 
-document.getElementById('auditMin').addEventListener('change', function () {
+function saveAuditSettings() {
     data.auditStats[0] = parseFloat(document.getElementById('auditMin').value)
-})
-
-document.getElementById('auditMax').addEventListener('change', function () {
     data.auditStats[1] = parseFloat(document.getElementById('auditMax').value)
-})
-
-document.getElementById('auditTimeMin').addEventListener('change', function () {
     data.auditStats[2] = parseFloat(document.getElementById('auditTimeMin').value)
-})
-
-document.getElementById('auditTimeMax').addEventListener('change', function () {
-    data.auditStats[3] = parseFloat(document.getElementById('auditTimeMax').value)
-})
+    data.auditStats[4] = parseFloat(document.getElementById('auditTimeMax').value)
+}
 
 function audit2() {
     if (data.audits == false) {
         data.audits = true
-        auditTimeout = setTimeout(audit, (random(data.auditStats[2], data.auditStats[3])) * 1000)
-        document.getElementById('audit').innerHTML = "Disable Audits"
+        auditTimeout = setTimeout(audit, (random(data.auditStats[2], data.auditStats[4])) * 1000)
+        document.getElementById('audit').innerText = "Disable Audits"
     } else {
         data.audits = false
         clearTimeout(auditTimeout)
-        document.getElementById('audit').innerHTML = "Enable Audits"
+        document.getElementById('audit').innerText = "Enable Audits"
     }
 }
 
@@ -1563,10 +2153,10 @@ function apiUpdate(interval) {
     if (interval) {
         if (data.apiUpdates.enabled == false) {
             clearInterval(apiInterval)
-            document.getElementById('enableApiUpdate').innerHTML = "Enable API Updates"
+            document.getElementById('enableApiUpdate').innerText = "Enable API Updates"
         }
     }
-    let url = data.apiUpdates.url
+    let url = data.apiUpdates.url;
     let groups = []
     let channels = ''
     for (let i = 0; i < data.data.length; i++) {
@@ -1615,21 +2205,21 @@ function apiUpdate(interval) {
     }
     function fetchNext(url) {
         if (data.apiUpdates.method == 'GET') {
-            if (Object.keys(data.apiUpdates.headers).filter(x=>x).length) {
+            if (Object.keys(data.apiUpdates.headers).filter(x => x).length) {
                 fetch(url, {
                     method: data.apiUpdates.method,
                     headers: data.apiUpdates.headers,
                 }).then(response => response.json())
-                .then(json => {
-                    doStuff(json)
-                })
+                    .then(json => {
+                        doStuff(json)
+                    })
             } else {
                 fetch(url, {
                     method: data.apiUpdates.method
                 }).then(response => response.json())
-                .then(json => {
-                    doStuff(json)
-                })
+                    .then(json => {
+                        doStuff(json)
+                    })
             }
         } else {
             fetch(url, {
@@ -1644,84 +2234,138 @@ function apiUpdate(interval) {
     }
     function doStuff(json) {
         let channels = json;
-        if (data.apiUpdates.response.loop != 'data') {
-            channels = channels[data.apiUpdates.response['loop'].split('data.')[1]]
+        if (data.apiUpdates.response.loop !== 'data') {
+            channels = channels[data.apiUpdates.response.loop.split('data.')[1]];
+        }
+        if (!Array.isArray(channels)) {
+            channels = [channels];
         }
         for (let i = 0; i < channels.length; i++) {
-            let nameUpdate = undefined
-            let countUpdate = undefined
-            let imageUpdate = undefined
-            let idUpdate = undefined
-            if (data.apiUpdates.response.name.enabled == true) {
-                const propertyNames = data.apiUpdates.response.name.path.split('.')
+            let nameUpdate = undefined;
+            let countUpdate = undefined;
+            let imageUpdate = undefined;
+            let idUpdate = undefined;
+            if (data.apiUpdates.response.name.enabled === true) {
+                let propertyNames = data.apiUpdates.response.name.path.split('.');
+                propertyNames = propertyNames.map(prop => {
+                    if (prop.includes('[')) {
+                        const split = prop.split('[');
+                        const index = parseInt(split[1].split(']')[0]);
+                        return [split[0], index];
+                    }
+                    return prop;
+                }).flat();
                 let result = channels[i];
                 for (const propName of propertyNames) {
                     result = result[propName];
                 }
-                nameUpdate = result
+                nameUpdate = result;
             }
-            if (data.apiUpdates.response.count.enabled == true) {
-                const propertyNames = data.apiUpdates.response.count.path.split('.')
+            if (data.apiUpdates.response.count.enabled === true) {
+                let propertyNames = data.apiUpdates.response.count.path.split('.');
+                propertyNames = propertyNames.map(prop => {
+                    if (prop.includes('[')) {
+                        const split = prop.split('[');
+                        const index = parseInt(split[1].split(']')[0]);
+                        return [split[0], index];
+                    }
+                    return prop;
+                }).flat();
                 let result = channels[i];
                 for (const propName of propertyNames) {
                     result = result[propName];
                 }
-                countUpdate = result
+                countUpdate = result;
             }
-            if (data.apiUpdates.response.image.enabled == true) {
-                const propertyNames = data.apiUpdates.response.image.path.split('.')
+            if (data.apiUpdates.response.image.enabled === true) {
+                let propertyNames = data.apiUpdates.response.image.path.split('.');
+                propertyNames = propertyNames.map(prop => {
+                    if (prop.includes('[')) {
+                        const split = prop.split('[');
+                        const index = parseInt(split[1].split(']')[0]);
+                        return [split[0], index];
+                    }
+                    return prop;
+                }).flat();
                 let result = channels[i];
                 for (const propName of propertyNames) {
                     result = result[propName];
                 }
-                imageUpdate = result
+                imageUpdate = result;
             }
-            if (data.apiUpdates.response.id.enabled == true) {
-                const propertyNames = data.apiUpdates.response.id.path.split('.')
-                let result = channels[i];
-                for (const propName of propertyNames) {
-                    result = result[propName];
+            let propertyNames = data.apiUpdates.response.id.path.split('.');
+            propertyNames = propertyNames.map(prop => {
+                if (prop.includes('[')) {
+                    const split = prop.split('[');
+                    const index = parseInt(split[1].split(']')[0]);
+                    return [split[0], index];
                 }
-                idUpdate = result
+                return prop;
+            }).flat();
+            let result = channels[i];
+            for (const propName of propertyNames) {
+                result = result[propName];
             }
+            idUpdate = result;
+
             for (let r = 0; r < data.data.length; r++) {
-                if (data.data[r].id == idUpdate) {
-                    if (nameUpdate != undefined) {
-                        data.data[r].name = nameUpdate
+                if (data.apiUpdates.response.id.IDIncludes === true) {
+                    if (idUpdate.includes(data.data[r].id)) {
+                        if (nameUpdate !== undefined) {
+                            data.data[r].name = nameUpdate;
+                        }
+                        if (imageUpdate !== undefined) {
+                            data.data[r].image = imageUpdate;
+                        }
+                        if (countUpdate !== undefined) {
+                            if (data.apiUpdates.forceUpdates) {
+                                data.data[r].count = countUpdate;
+                            } else if (abb(countUpdate) !== abb(data.data[r].count)) {
+                                data.data[r].count = countUpdate;
+                            }
+                        }
                     }
-                    if (imageUpdate != undefined) {
-                        data.data[r].image = imageUpdate
-                    }
-                    if (countUpdate != undefined) {
-                        if (abb(countUpdate) != abb(data.data[r].count)) {
-                            data.data[r].count = countUpdate
+                } else {
+                    if (data.data[r].id === idUpdate) {
+                        if (nameUpdate !== undefined) {
+                            data.data[r].name = nameUpdate;
+                        }
+                        if (imageUpdate !== undefined) {
+                            data.data[r].image = imageUpdate;
+                        }
+                        if (countUpdate !== undefined) {
+                            if (abb(countUpdate) !== abb(data.data[r].count)) {
+                                data.data[r].count = countUpdate;
+                            }
                         }
                     }
                 }
             }
         }
     }
+
 }
 
 function enableApiUpdate() {
     clearInterval(apiInterval)
     if (data.apiUpdates.enabled == false) {
         data.apiUpdates.enabled = true
-        document.getElementById('enableApiUpdate').innerHTML = "Disable API Updates"
+        document.getElementById('enableApiUpdate').innerText = "Disable API Updates"
         apiInterval = setInterval(function () {
             apiUpdate(true)
         }, data.apiUpdates.interval)
         apiUpdate(true)
     } else {
         data.apiUpdates.enabled = false
-        document.getElementById('enableApiUpdate').innerHTML = "Enable API Updates"
+        document.getElementById('enableApiUpdate').innerText = "Enable API Updates"
     }
 }
 
 function saveAPIUpdates() {
     data.apiUpdates.url = document.getElementById('apiLink').value
     data.apiUpdates.maxChannelsPerFetch = (document.getElementById('apiType').value == 'none') ? 'one' : document.getElementById('apiType').value
-    data.apiUpdates.method = document.getElementById('apiMethod').value
+    data.apiUpdates.method = document.getElementById('apiMethod').value;
+    data.apiUpdates.forceUpdates = document.getElementById('forceUpdates').checked;
     let headers = document.getElementById('extraCred').value.toString().split(';&#10;').join(';\n').split(';\n')
     let newHeaders = {}
     for (let i = 0; i < headers.length; i++) {
@@ -1753,13 +2397,13 @@ function saveAPIUpdates() {
             'path': document.getElementById('pathImage').value
         },
         'id': {
-            'enabled': document.getElementById('updateID').checked,
+            'IDIncludes': document.getElementById('IDIncludes').checked,
             'path': document.getElementById('pathID').value
         }
     }
-    data.apiUpdates.interval = parseFloat(document.getElementById('apiUpdateInt').value) * 1000
-    data.apiUpdates.enabled = document.getElementById('enableApiUpdate').innerHTML == 'Disable API Updates' ? true : false
-    alert('Saved!')
+    data.apiUpdates.interval = parseFloat(document.getElementById('apiUpdateInt').value) * 1000;
+    data.apiUpdates.enabled = document.getElementById('enableApiUpdate').innerText == 'Disable API Updates' ? true : false;
+    alert('API Update Settings Saved')
 }
 
 function loadAPIUpdates() {
@@ -1783,140 +2427,83 @@ function loadAPIUpdates() {
     document.getElementById('pathCount').value = data.apiUpdates.response.count.path
     document.getElementById('updateImage').checked = data.apiUpdates.response.image.enabled
     document.getElementById('pathImage').value = data.apiUpdates.response.image.path
-    document.getElementById('updateID').checked = data.apiUpdates.response.id.enabled
+    document.getElementById('IDIncludes').checked = data.apiUpdates.response.id.IDIncludes
     document.getElementById('pathID').value = data.apiUpdates.response.id.path
     document.getElementById('apiUpdateInt').value = data.apiUpdates.interval / 1000;
-    document.getElementById('enableApiUpdate').innerHTML = data.apiUpdates.enabled == true ? 'Disable API Updates' : 'Enable API Updates'
+    document.getElementById('enableApiUpdate').innerText = data.apiUpdates.enabled == true ? 'Disable API Updates' : 'Enable API Updates'
 }
 loadAPIUpdates()
-
-function popupList() {
-    let sort = data.sort;
-    let order = data.order;
-    let theme = data.theme;
-    let id = uuidGen();
-    let channels = data.data;
-    if (specificChannels.length > 0) {
-        channels = [];
-        for (let i = 0; i < data.data.length; i++) {
-            if (specificChannels.includes(data.data[i].id)) {
-                channels.push(data.data[i]);
-            }
-        }
-    }
-    let popup = window.open('http://localhost/top50/popup.html', 'FYSC', 'width=1000,height=500');
-    console.log(channels)
-    popups.push({
-        'sort': sort,
-        'order': order,
-        'theme': theme,
-        'channels': channels,
-        'id': id,
-        'popup': popup,
-        'specificChannels': true
-    })
-    let design = setupDesign(channels, sort, order);
-    let designStuff = {
-        "showImages": data.showImages,
-        "showNames": data.showNames,
-        "showCounts": data.showCounts,
-        "showRankings": data.showRankings,
-        "bgColor": data.bgColor,
-        "textColor": data.textColor,
-        "boxColor": data.boxColor,
-        "boxBorder": data.boxBorder,
-        "imageBorder": data.imageBorder,
-        "imageBorderColor": data.imageBorderColor,
-        "prependZeros": data.prependZeros,
-        "animation": data.animation,
-        "abbreviate": data.abbreviate,
-        "fastest": data.fastest,
-        "slowest": data.slowest,
-        'odometerUp': data.odometerUp,
-        'odometerDown': data.odometerDown,
-        'odometerSpeed': data.odometerSpeed,
-        'theme': data.theme,
-        'sort': data.sort,
-        'order': data.order,
-        'max': data.max,
-        'data': data.data,
-        'visulization': data.visulization
-    }
-    popup.document.write('<link href="./index.css" rel="stylesheet" type="text/css">')
-    popup.document.write('<link href="./odometer.css" rel="stylesheet" type="text/css">')
-    popup.document.write('<script src="./odometer.js"></script>')
-    popup.document.write(`<style>${design[2]}</style>`)
-    popup.document.write(`<div id="main" class="main" style="${design[1]}">${design[0].innerHTML}</div>`)
-    popup.document.write(`<script>
-    let data = ${JSON.stringify(designStuff)};
-    let observer = new MutationObserver(mutationRecords => {
-        if (document.getElementById('channels')) {
-            data.data = JSON.parse(document.getElementById('channels').innerHTML);
-            document.getElementById('channels').remove();
-            update();
-        }
-      });
-      const abb = ${abb}
-      const updateOdo = ${updateOdo}</script>`)
-    popup.document.write(`<script src="./popup.js"></script>`);
-}
 
 function selectSpecificChannels() {
     if (pickingChannels == true) {
         pause()
-        document.getElementById('selectSpecific').innerHTML = 'Select Specific Channels'
+        document.getElementById('selectSpecific').innerText = 'Select Specific Channels'
+        document.getElementById('main').removeEventListener('click', selectorFunction)
         pickingChannels = false;
         alert("Saved")
     } else {
         if (confirm('This will reset the previous list of SELECTED channels.')) {
+            quickSelecting = false;
+            document.getElementById('quickSelectButton').style.border = ""
+            document.getElementById('main').removeEventListener('click', selectorFunction, { once: true })
             specificChannels = [];
-            alert('Click on the channels you want to add to the list. Click the button again to stop.')
-            document.getElementById('selectSpecific').innerHTML = 'Stop Selecting Channels'
+            alert('Click on the channels you want to add to the list. Click the button again to stop. Counters will pause while selecting channels.')
+            document.getElementById('main').addEventListener('click', selectorFunction)
+            document.getElementById('selectSpecific').innerText = 'Stop Selecting Channels'
             pause()
             pickingChannels = true;
+
         }
     }
 }
 
-function selecterFunction(e) {
+function selectorFunction(e) {
+    let target = e.target;
+    if (quickSelecting || pickingChannels) {
+        while (target && !target.id?.startsWith('card_') && target.nodeName !== 'BODY') {
+            target = target.parentElement
+        }
+        if (!target) return;
+    }
+    //let id = target.id?.split('_')[1]
+    //some ids may have more than one underscore, some may have 2, 3, 4, etc. we want all but the first one
+    let id = target.id?.split('_').slice(1).join('_')
     if (pickingChannels == true) {
-        let id = e.target.id.split('_')[1]
         if (specificChannels.includes(id)) {
             specificChannels.splice(specificChannels.indexOf(id), 1)
             document.getElementById('card_' + id).style.border = 'solid 0.1em ' + data.boxBorder
         } else {
-            specificChannels.push(id)
-            document.getElementById('card_' + id).style.border = 'solid 0.1em blue'
-        }
-    } else {
-        let id = e.target.id.split("_")[1];
-        if (e.target.id.split("_").length > 2) {
-            for (let i = 2; i < e.target.id.split("_").length; i++) {
-                id = id + "_" + e.target.id.split("_")[i];
+            if (id) {
+                specificChannels.push(id)
+                document.getElementById('card_' + id).style.border = 'solid 0.1em blue'
             }
         }
+    } else {
         if (selected != null) {
             document.getElementById('card_' + selected + '').classList.remove('selected');
             document.getElementById('card_' + selected + '').style.border = "solid 0.1em " + data.boxBorder + "";
         }
-        if (id == selected) {
+        if (!id || id == selected) {
+            document.getElementById('quickSelect').value = 'select';
             if (selected != null) {
-                document.getElementById('card_' + id + '').classList.remove('selected');
-                document.getElementById('card_' + id + '').style.border = "solid 0.1em " + data.boxBorder + "";
+                document.getElementById('card_' + selected + '').classList.remove('selected');
+                document.getElementById('card_' + selected + '').style.border = "solid 0.1em " + data.boxBorder + "";
                 selected = null;
                 document.getElementById('edit_min_gain').value = "";
                 document.getElementById('edit_mean_gain').value = "";
                 document.getElementById('edit_std_gain').value = "";
                 document.getElementById('edit_max_gain').value = "";
                 document.getElementById('edit_name').value = "";
+                document.getElementById('edit_bg_color').value = "";
                 document.getElementById('edit_count').value = "";
                 document.getElementById('edit_image1').value = "";
             }
         } else {
-            if (document.getElementById('card_' + id + '')) {
-                document.getElementById('card_' + id + '').classList.add('selected');
-                document.getElementById('card_' + id + '').style.border = "solid 0.1em red"
-                selected = id;
+            selected = id;
+            document.getElementById('quickSelect').value = selected || 'select';
+            if (document.getElementById('card_' + selected + '')) {
+                document.getElementById('card_' + selected + '').classList.add('selected');
+                document.getElementById('card_' + selected + '').style.border = "solid 0.1em red"
                 for (let q = 0; q < data.data.length; q++) {
                     if (data.data[q].id == id) {
                         if ((data.data[q].mean_gain) && (data.data[q].std_gain) && (data.data[q].mean_gain != 0) && (data.data[q].std_gain != 0)) {
@@ -1932,11 +2519,333 @@ function selecterFunction(e) {
                         document.getElementById('edit_min_gain').value = data.data[q].min_gain;
                         document.getElementById('edit_max_gain').value = data.data[q].max_gain;
                         document.getElementById('edit_name').value = data.data[q].name;
+                        document.getElementById('edit_bg_color').value = data.data[q].bg ? data.data[q].bg_color : data.boxColor;
                         document.getElementById('edit_count').value = data.data[q].count;
                         document.getElementById('edit_image1').value = data.data[q].image;
+                        document.getElementById('edit_channel_id').innerText = 'ID: ' + data.data[q].id;
                     }
+                }
+            }
+            refresh();
+        }
+    }
+    quickSelecting = false;
+    document.getElementById('quickSelectButton').style.border = ""
+}
+
+function refresh() {
+    const currentChannel = document.getElementById('quickSelect').value;
+    if (!currentChannel || currentChannel == 'select') {
+        document.getElementById('edit_min_gain').value = "";
+        document.getElementById('edit_mean_gain').value = "";
+        document.getElementById('edit_std_gain').value = "";
+        document.getElementById('edit_max_gain').value = "";
+        document.getElementById('edit_name').value = "";
+        document.getElementById('edit_bg_color').value = "";
+        document.getElementById('edit_count').value = "";
+        document.getElementById('edit_image1').value = "";
+    } else {
+        for (let q = 0; q < data.data.length; q++) {
+            if (data.data[q].id == currentChannel) {
+                if ((data.data[q].mean_gain) && (data.data[q].std_gain) && (data.data[q].mean_gain != 0) && (data.data[q].std_gain != 0)) {
+                    document.getElementById('edit_mean_gain').value = data.data[q].mean_gain;
+                    document.getElementById('edit_mean_gain_check').checked = true;
+                    document.getElementById('edit_std_gain').value = data.data[q].mean_gain;
+                    document.getElementById('edit_std_gain_check').checked = true;
+                } else {
+                    document.getElementById('edit_mean_gain').value = "";
+                    document.getElementById('edit_mean_gain_check').checked = false;
+                    document.getElementById('edit_std_gain_check').checked = false;
+                }
+                document.getElementById('edit_min_gain').value = data.data[q].min_gain;
+                document.getElementById('edit_max_gain').value = data.data[q].max_gain;
+                document.getElementById('edit_name').value = data.data[q].name;
+                document.getElementById('edit_bg_color').value = data.data[q].bg ? data.data[q].bg : data.boxColor;
+                document.getElementById('edit_count').value = data.data[q].count;
+                document.getElementById('edit_image1').value = data.data[q].image;
+                document.getElementById('edit_channel_id').innerText = 'ID: ' + data.data[q].id;
+            }
+        }
+    }
+}
+
+document.getElementById("apiSource").addEventListener('change', function () {
+    if (document.getElementById("apiSource").value == 'mixerno1') {
+        data.apiUpdates = {
+            'enabled': false,
+            'url': 'https://mixerno.space/api/youtube-channel-counter/user/{{channels}}',
+            'interval': 10000,
+            'method': 'GET',
+            'body': '',
+            'headers': '',
+            'maxChannelsPerFetch': 'one',
+            'custom': false,
+            'response': {
+                'loop': 'data',
+                'name': {
+                    'enabled': true,
+                    'path': 'user[0].count'
+                },
+                'count': {
+                    'enabled': true,
+                    'path': 'counts[2].count'
+                },
+                'image': {
+                    'enabled': true,
+                    'path': 'user[1].count'
+                },
+                'id': {
+                    'IDIncludes': true,
+                    'path': 'user[1].count'
+                }
+            }
+        }
+    } else if (document.getElementById("apiSource").value == 'mixerno2') {
+        data.apiUpdates = {
+            'enabled': false,
+            'url': 'https://mixerno.space/api/youtube-channel-counter/user/{{channels}}',
+            'interval': 10000,
+            'method': 'GET',
+            'body': '',
+            'headers': '',
+            'maxChannelsPerFetch': 'one',
+            'custom': false,
+            'response': {
+                'loop': 'data',
+                'name': {
+                    'enabled': true,
+                    'path': 'user[0].count'
+                },
+                'count': {
+                    'enabled': true,
+                    'path': 'counts[0].count'
+                },
+                'image': {
+                    'enabled': true,
+                    'path': 'user[1].count'
+                },
+                'id': {
+                    'IDIncludes': true,
+                    'path': 'user[1].count'
                 }
             }
         }
     }
+    loadAPIUpdates();
+})
+
+const addFireIcon = () => {
+    if (document.getElementById('fireIconCreate')) {
+        document.getElementById('fireIconCreate').remove();
+    } else {
+        let div = document.createElement('div');
+        div.id = 'fireIconCreate';
+        div.style.color = '#FFF';
+        div.innerHTML = `
+            <label>Fire Icon Name: </label><input type="text" id="fireIcon" placeholder="Fire Icon 1"><br>
+            <label>Fire Icon Threshold: </label><input type="text" id="fireIconThreshold" placeholder="1000"><br>
+            <label>Fire Icon Threshold Method: </label><select id="fireIconMethod" name="fireIconMethod">
+                <option value=">=">Greater Than (>=)</option>
+                <option value="==">Equal To (==)</option>
+                <option value="<=">Less Than (<=)</option>
+                <option value="!=">Not Equal To (!=)</option>
+            </select><br>
+            <label>Fire Icon:</label><input type="text" id="fireIconUrl" placeholder="https://example.com/image.png"><label> or </label><input type="file" id="fireIconFile"><br>
+            <label>Rank Text Color: </label><input type="text" id="fireIconRankColor" placeholder="#FFF"><br>
+            <button onclick="saveFireIcon()">Add</button>
+        `
+        document.getElementById('fireIconsCreate').appendChild(div);
+    }
+}
+
+function getBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+const saveFireIcon = async () => {
+    let file = document.getElementById('fireIconFile').files[0];
+    if (file) {
+        file = await getBase64(file);
+    } else {
+        file = document.getElementById('fireIconUrl').value;
+    }
+    if (!file || !document.getElementById('fireIcon').value || !document.getElementById('fireIconThreshold').value || !document.getElementById('fireIconMethod').value || !document.getElementById('fireIconRankColor').value) {
+        alert('Please fill out all fields.');
+        return;
+    }
+    if (!data.fireIcons) {
+        data.fireIcons = {
+            'enabled': false,
+            'type': 'gain',
+            'firePosition': 'above',
+            'marginTop': 0,
+            'fireBorderColor': '#FFF',
+            'fireBorderWidth': 0,
+            'fireBorderRadius': 0,
+            'created': []
+        };
+    }
+    // Make sure the name isn't already used
+    let used = data.fireIcons.created.some(icon => icon.name === document.getElementById('fireIcon').value);
+
+    if (used) {
+        alert('Fire emojis must have unique names!');
+        return;
+    }
+
+    data.fireIcons.created.push({
+        name: document.getElementById('fireIcon').value,
+        threshold: document.getElementById('fireIconThreshold').value,
+        icon: file,
+        color: document.getElementById('fireIconRankColor').value,
+        method: document.getElementById('fireIconMethod').value
+    });
+
+    document.getElementById('fireIconCreate').remove();
+    loadFireIcons();
+};
+
+function reOrderFire(type, index) {
+    if (type === 'up' && index > 0) {
+        // Swap with the previous item
+        [data.fireIcons.created[index], data.fireIcons.created[index - 1]] =
+            [data.fireIcons.created[index - 1], data.fireIcons.created[index]];
+    } else if (type === 'down' && index < data.fireIcons.created.length - 1) {
+        // Swap with the next item
+        [data.fireIcons.created[index], data.fireIcons.created[index + 1]] =
+            [data.fireIcons.created[index + 1], data.fireIcons.created[index]];
+    }
+    loadFireIcons();
+}
+
+const loadFireIcons = () => {
+    let div = document.getElementById('fireIcons');
+    div.innerHTML = '';
+    for (let i = 0; i < data.fireIcons.created.length; i++) {
+        let fireIcon = data.fireIcons.created[i];
+        let icon = fireIcon.icon;
+        if (icon) {
+            icon = `<img src="${escapeHTML(icon)}" style="height: 1.5em; width: 1.5em;">`
+        }
+        let html = `
+            <div style="display: flex; justify-content: space-between; color: #FFF; padding: 0.5em; margin: 0.5em 0; border-radius: 0.2em;">
+                <div style="display: flex; align-items: center;">
+                    <div style="color: #FFF; padding: 0.2em; border-radius: 0.2em;">${icon}</div>
+                    <input class="fire_input" style="margin-left: 0.5em;" value="${escapeHTML(fireIcon.name)}" id="new_fire_name_${i}">
+                    <select id="new_fire_method_${i}">
+                        <option ${fireIcon.method == '>=' ? 'selected' : ''} value=">=">Count >=</option>
+                        <option ${fireIcon.method == '==' ? 'selected' : ''} value="==">Count ==</option>
+                        <option ${fireIcon.method == '<=' ? 'selected' : ''} value="<=">Count <=</option>
+                        <option ${fireIcon.method == '!=' ? 'selected' : ''} value="!=">Count !=</option>
+                    </select>
+                    <input id="new_fire_threshold_${i}" class="fire_input" value="${escapeHTML(fireIcon.threshold)}">
+                    <input id="new_fire_color_${i}" class="fire_input" value="${escapeHTML(fireIcon.color)}">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr">
+                    <div><button onclick="saveFireEdits(${i})">Save</button></div>
+                    <div><button onclick="deleteFireIcon(${i})">Delete</button></div>
+                    <div><button onclick="reOrderFire('up',${i})">Up</button></div>
+                    <div><button onclick="reOrderFire('down',${i})">Down</button></div>
+                </div>
+            </div>`
+        div.innerHTML += html;
+    }
+    if (data.fireIcons.created.length == 0) {
+        div.innerHTML = 'No fire icons created.'
+    }
+    document.getElementById('fireEnabled').checked = data.fireIcons.enabled || false;
+    document.getElementById('fireType').value = data.fireIcons.type || 'gain';
+    document.getElementById('firePosition').value = data.fireIcons.firePosition || 'above';
+    document.getElementById('fireBorderColor').value = data.fireIcons.fireBorderColor || '#FFF';
+    document.getElementById('fireBorderWidth').value = data.fireIcons.fireBorderWidth || 0;
+}
+loadFireIcons();
+
+const deleteFireIcon = (index) => {
+    data.fireIcons.created.splice(index, 1);
+    loadFireIcons();
+}
+
+const saveFireEdits = (index) => {
+    let used = data.fireIcons.created.some(icon => icon.name === document.getElementById('new_fire_name_' + index).value);
+
+    if (used) {
+        if (document.getElementById('new_fire_name_' + index).value != data.fireIcons.created[index].name) {
+            alert('Fire emojis must have unique names!');
+            return;
+        }
+    }
+
+    data.fireIcons.created[index] = {
+        name: document.getElementById('new_fire_name_' + index).value,
+        threshold: parseInt(document.getElementById('new_fire_threshold_' + index).value),
+        icon: data.fireIcons.created[index].icon,
+        method: document.getElementById('new_fire_method_' + index).value,
+        color: document.getElementById('new_fire_color_' + index).value,
+    };
+};
+
+document.getElementById('fireEnabled').addEventListener('click', function () {
+    data.fireIcons.enabled = document.getElementById('fireEnabled').checked;
+});
+
+document.getElementById('fireType').addEventListener('change', function () {
+    data.fireIcons.type = document.getElementById('fireType').value;
+});
+
+document.getElementById('firePosition').addEventListener('change', function () {
+    data.fireIcons.firePosition = document.getElementById('firePosition').value;
+    if (data.fireIcons.firePosition == 'mdm') {
+        setupMDMStyles()
+    } else {
+        setupMDMStyles(true)
+    }
+});
+
+document.getElementById('fireBorderColor').addEventListener('change', function () {
+    data.fireIcons.fireBorderColor = document.getElementById('fireBorderColor').value;
+});
+
+document.getElementById('fireBorderWidth').addEventListener('change', function () {
+    data.fireIcons.fireBorderWidth = document.getElementById('fireBorderWidth').value;
+});
+
+document.getElementById('boxBGGain').addEventListener('change', function () {
+    data.boxBGGain = document.getElementById('boxBGGain').value;
+});
+
+document.getElementById('boxBGLose').addEventListener('change', function () {
+    data.boxBGLose = document.getElementById('boxBGLose').value;
+});
+
+document.getElementById('boxBGLength').addEventListener('change', function () {
+    data.boxBGLength = document.getElementById('boxBGLength').value;
+});
+
+
+document.getElementById('disableBoxBorderColor').addEventListener('click', function () {
+    data.boxBorder = 'transparent';
+    fix();
+});
+
+document.getElementById('disableImageBorderColor').addEventListener('click', function () {
+    data.imageBorderColor = 'transparent';
+    fix();
+});
+
+function importMDMIcons() {
+    fetch('./mdm_gifs/default.json')
+        .then(response => response.json())
+        .then(data2 => {
+            data2.forEach(icon => {
+                data.fireIcons.created.push(icon);
+            });
+            loadFireIcons();
+        })
+        .catch(error => console.error('Error importing MDM icons:', error));
 }
