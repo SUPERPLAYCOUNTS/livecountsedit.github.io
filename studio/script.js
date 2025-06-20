@@ -1,3 +1,8 @@
+window.odometerOptions = {
+	animation: "byDigit",
+	removeLeadingZeros: true
+}
+
 let cmm = 0;
 let raw = 0;
 let m = "100b";
@@ -10,13 +15,19 @@ const uuidGen = function () {
 	return a() + a() + '-' + a() + '-' + a() + '-' + a() + '-' + a() + a() + a();
 }
 
+const setMarginTopOfCount = function () {
+	const countElement = document.getElementById('count');
+	const value = document.getElementById('marginTopOfCount').value;
+	countElement.style.marginTop = `${value}px`;
+}
+
 const selectElement = document.getElementById('selectcomma');
 const comma1Element = document.getElementById('comma1a');
 const comma2Element = document.getElementById('comma2a');
 const comma3Element = document.getElementById('comma3a');
 
 let user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {
-	name: "Loading",
+	name: "Livecountsedit",
 	image: "../default.png",
 	footer: "Subscribers",
 	count: 0,
@@ -46,7 +57,11 @@ let user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"
 	abbreviate: false,
 };
 if (!user.count) {
-	user.count = user.subscribers;
+	user.count = user.subscribers || 0;
+}
+
+function render() {
+	document.querySelector('.odometer').innerText = Math.round(user.count);
 }
 
 if (user.graphType == "live") {
@@ -139,372 +154,18 @@ const chart = new Highcharts.chart({
 });
 
 function abb(count) {
-	if (count === 0) return "0";
-	const ABBREVIATIONS = ["", "K", "M", "B"];
-	const isNegative = count < 0;
-	const absCount = Math.abs(count);
-	const index = absCount === 0 ? 0 : Math.floor(Math.log10(absCount) / 3);
-	let result = (absCount / Math.pow(1000, index)).toFixed(2).toString();
-	result += ABBREVIATIONS[index];
-	if (isNegative) {
-		result = `-${result}`;
-	}
-	const parts = result.split(".");
-	if (parts[1] && parts[1].length > 1) {
-		result = parts[0] + "." + parts[1][0];
-		result += ABBREVIATIONS[index];
-		if (isNegative) {
-			result = `-${result}`;
-		}
-	}
-	return result;
+	const negative = count < 0 ? true : false;
+    count = Math.round(Math.abs(count));
+    if (count < 1000) {
+        if (negative) return `-${count}`;
+        else return count.toString();
+    } else {
+        const abbreviations = "KMBT";
+        const a = Math.floor(Math.log10(count)/3)
+        if (negative) return "-" + (count / (1000 ** a)).toFixed(1) + abbreviations[a-1];
+        else return (count / (1000 ** a)).toFixed(1) + abbreviations[a-1];
+    }
 }
-
-function settype(n) {
-	if (n < 1000000000000) {
-		m = '100b'
-		document.querySelector("#odo1a").style.display = "inline-block"
-		document.querySelector("#odo2a").style.display = "inline-block"
-		document.querySelector("#odo3a").style.display = "inline-block"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "inline-block"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 100000000000) {
-		m = '10b'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "inline-block"
-		document.querySelector("#odo3a").style.display = "inline-block"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "inline-block"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 10000000000) {
-		m = '1b'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "inline-block"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "inline-block"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 1000000000) {
-		m = '100m'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 100000000) {
-		m = '10m'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 10000000) {
-		m = '1m'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 1000000) {
-		m = '100k'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 100000) {
-		m = '10k'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 10000) {
-		m = '1k'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 1000) {
-		m = '100'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "none"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "none"
-	}
-	if (n < 100) {
-		m = '10'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "none"
-		document.querySelector("#odo10a").style.display = "none"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "none"
-	}
-	if (n < 10) {
-		m = '1'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "none"
-		document.querySelector("#odo10a").style.display = "none"
-		document.querySelector("#odo11a").style.display = "none"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "none"
-	}
-	return m
-}
-
-function render() {
-	settype(raw)
-	if (m == '100b') {
-		odo1a.innerHTML = cmm[0]
-		odo2a.innerHTML = cmm[1]
-		odo3a.innerHTML = cmm[2]
-		odo4a.innerHTML = cmm[3]
-		odo5a.innerHTML = cmm[4]
-		odo6a.innerHTML = cmm[5]
-		odo7a.innerHTML = cmm[6]
-		odo8a.innerHTML = cmm[7]
-		odo9a.innerHTML = cmm[8]
-		odo10a.innerHTML = cmm[9]
-		odo11a.innerHTML = cmm[10]
-		odo12a.innerHTML = cmm[11]
-	}
-	if (m == '10b') {
-		odo2a.innerHTML = cmm[0]
-		odo3a.innerHTML = cmm[1]
-		odo4a.innerHTML = cmm[2]
-		odo5a.innerHTML = cmm[3]
-		odo6a.innerHTML = cmm[4]
-		odo7a.innerHTML = cmm[5]
-		odo8a.innerHTML = cmm[6]
-		odo9a.innerHTML = cmm[7]
-		odo10a.innerHTML = cmm[8]
-		odo11a.innerHTML = cmm[9]
-		odo12a.innerHTML = cmm[10]
-	}
-	if (m == '1b') {
-		odo3a.innerHTML = cmm[0]
-		odo4a.innerHTML = cmm[1]
-		odo5a.innerHTML = cmm[2]
-		odo6a.innerHTML = cmm[3]
-		odo7a.innerHTML = cmm[4]
-		odo8a.innerHTML = cmm[5]
-		odo9a.innerHTML = cmm[6]
-		odo10a.innerHTML = cmm[7]
-		odo11a.innerHTML = cmm[8]
-		odo12a.innerHTML = cmm[9]
-	}
-	if (m == '100m') {
-		odo4a.innerHTML = cmm[0]
-		odo5a.innerHTML = cmm[1]
-		odo6a.innerHTML = cmm[2]
-		odo7a.innerHTML = cmm[3]
-		odo8a.innerHTML = cmm[4]
-		odo9a.innerHTML = cmm[5]
-		odo10a.innerHTML = cmm[6]
-		odo11a.innerHTML = cmm[7]
-		odo12a.innerHTML = cmm[8]
-	}
-	if (m == '10m') {
-		odo5a.innerHTML = cmm[0]
-		odo6a.innerHTML = cmm[1]
-		odo7a.innerHTML = cmm[2]
-		odo8a.innerHTML = cmm[3]
-		odo9a.innerHTML = cmm[4]
-		odo10a.innerHTML = cmm[5]
-		odo11a.innerHTML = cmm[6]
-		odo12a.innerHTML = cmm[7]
-	}
-	if (m == '1m') {
-		odo6a.innerHTML = cmm[0]
-		odo7a.innerHTML = cmm[1]
-		odo8a.innerHTML = cmm[2]
-		odo9a.innerHTML = cmm[3]
-		odo10a.innerHTML = cmm[4]
-		odo11a.innerHTML = cmm[5]
-		odo12a.innerHTML = cmm[6]
-	}
-	if (m == '100k') {
-		odo7a.innerHTML = cmm[0]
-		odo8a.innerHTML = cmm[1]
-		odo9a.innerHTML = cmm[2]
-		odo10a.innerHTML = cmm[3]
-		odo11a.innerHTML = cmm[4]
-		odo12a.innerHTML = cmm[5]
-	}
-	if (m == '10k') {
-		odo8a.innerHTML = cmm[0]
-		odo9a.innerHTML = cmm[1]
-		odo10a.innerHTML = cmm[2]
-		odo11a.innerHTML = cmm[3]
-		odo12a.innerHTML = cmm[4]
-	}
-	if (m == '1k') {
-		odo9a.innerHTML = cmm[0]
-		odo10a.innerHTML = cmm[1]
-		odo11a.innerHTML = cmm[2]
-		odo12a.innerHTML = cmm[3]
-	}
-	if (m == '100') {
-		odo10a.innerHTML = cmm[0]
-		odo11a.innerHTML = cmm[1]
-		odo12a.innerHTML = cmm[2]
-	}
-	if (m == '10') {
-		odo11a.innerHTML = cmm[0]
-		odo12a.innerHTML = cmm[1]
-	}
-	if (m == '1') {
-		odo12a.innerHTML = cmm[0]
-	}
-}
-
-selectElement.addEventListener('change', function() {
-	const selectedValue = this.value;
-	switch(selectedValue) {
-		case 'comma1':
-			comma1Element.textContent = ',';
-			comma2Element.textContent = ',';
-			comma3Element.textContent = ',';
-			break;
-		case 'comma2':
-			comma1Element.textContent = ' ';
-			comma2Element.textContent = ' ';
-			comma3Element.textContent = ' ';
-			break;
-		default:
-			comma1Element.textContent = ',';
-			comma2Element.textContent = ',';
-			comma3Element.textContent = ',';
-	}
-});
 
 function openmenu() {
 	if (document.getElementById('settingsMenu').style.visibility == "visible") {
@@ -614,7 +275,7 @@ function saveData() {
 }
 
 function exportData() {
-	let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(user));
+	let dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(JSON.stringify(user));
 	let dlAnchorElem = document.createElement("a");
 	dlAnchorElem.setAttribute("href", dataStr);
 	dlAnchorElem.setAttribute("download", "data.json");
@@ -623,10 +284,10 @@ function exportData() {
 
 function toggleTheme() {
 	const stylesheet = document.getElementById("themeStylesheet");
-	if (stylesheet.getAttribute("href") === "./style.css") {
-		stylesheet.setAttribute("href", "./dark.css");
+	if (stylesheet.getAttribute("href") === "./dark.css") {
+		stylesheet.setAttribute("href", "./light.css");
 	} else {
-		stylesheet.setAttribute("href", "./style.css");
+		stylesheet.setAttribute("href", "./dark.css");
 	}
 }
 

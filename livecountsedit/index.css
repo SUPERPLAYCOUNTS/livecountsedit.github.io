@@ -12,12 +12,18 @@
 body {
     background-color: var(--bg-color, #1a1a20);
     font-family: Lato, Arial, Helvetica, sans-serif;
-    color: var(--fg-color, #fff)
+    color: var(--fg-color, #fff);
 }
 
-.container {
+.lcedit-container {
     width: 100%;
     height: 90%;
+    display: flex;
+    justify-content: center;
+}
+
+.file-import {
+    display: none;
 }
 
 .tabs {
@@ -26,18 +32,19 @@ body {
     width: 15%;
     height: 100%;
     border-radius: 15px;
+    overflow-y: auto;
 }
 
 .tab-link {
     display: block;
     background-color: inherit;
     color: var(--fg-color, #fff);
-    padding: 22px 16px;
+    padding: 11px 8px;
     width: 100%;
     border: 1px solid var(--border-color, #ddd);
     outline: none;
     cursor: pointer;
-    transition: .3s;
+    transition: background-color .3s;
     border-radius: 15px;
 }
 
@@ -55,9 +62,10 @@ body {
     padding: 0px 12px;
     border: 1px solid var(--border-color, #ddd);
     border-left: none;
-    width: 30%;
+    width: 30vw;
     height: 100%;
     border-radius: 15px;
+    overflow-y: scroll;
 }
 
 .counter-content {
@@ -71,7 +79,7 @@ body {
     border-radius: 15px;
 }
 
-.counter-container {
+.counter-area {
     padding: 20px 5px;
     width: 98%;
     height: 87%;
@@ -116,4 +124,16 @@ body {
 .invalid {
     border: 2px solid red;
     background-color: #ffcccc
+}
+
+.page-footer {
+    text-align: center;
+    bottom: 5px;
+    left: 0;
+    right: 0;
+    position: absolute;
+}
+
+.fa.fa-info-circle {
+    font-size: 1rem;
 }
