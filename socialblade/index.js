@@ -34,7 +34,6 @@ class LivecountseditInterface {
             }
         this.setTitle = function () {
             document.getElementById("userName").innerHTML = document.getElementById("options.counter.title").value
-            document.title = document.getElementById("options.counter.title").value + "'s Real-Time Subscriber Count - Social Blade YouTube Stats | YouTube Statistics"
         }
         this.setValue = function () {
             document.getElementById("counter").innerHTML = parseFloat(document.getElementById("options.counter.value").value)
@@ -128,7 +127,64 @@ document.getElementById("options.counter.rates.basicMaximum").addEventListener('
 document.getElementById("options.counter.rates.mode.basic.units").addEventListener('input', Interface.setRate)
 document.getElementById("options.counter.rates.mode.basic.baseUnit").addEventListener('change', Interface.setRate)
 document.getElementById("options.counter.rates.mode.basic.baseUnit2").addEventListener('change', Interface.setRate)
-
+document.getElementById("options-counter-type").addEventListener("change", () => {
+    switch (document.getElementById("options-counter-type").value) {
+        case "youtube":
+            document.querySelector(".platform-icon").style.display = "inline";
+            document.querySelector(".platform-icon").src = "youtube-icon.png";
+            document.getElementById("SearchInput").placeholder = "Enter YouTube Username";
+            document.getElementById("realtime-title").innerText = "Real Time YouTube Subscriber Count";
+            document.getElementById("live-count-watermark").innerText = "YouTube Live Subscriber Count";
+            document.getElementById("live-count-watermark").style.color = "#d64e33";
+            document.getElementById("platform-plus-sign").style.backgroundColor = "#e62117";
+            document.getElementById("userimg").style.border = "1px solid #e62117";
+            break;
+        case "twitch":
+            document.querySelector(".platform-icon").style.display = "inline";
+            document.querySelector(".platform-icon").src = "twitch-icon.png";
+            document.getElementById("SearchInput").placeholder = "Enter Twitch Username";
+            document.getElementById("realtime-title").innerText = "Real Time Twitch Follower Count";
+            document.getElementById("live-count-watermark").innerText = "Twitch Live Follower Count";
+            document.getElementById("live-count-watermark").style.color = "#3a0070";
+            document.getElementById("platform-plus-sign").style.backgroundColor = "#7a31b3";
+            document.getElementById("userimg").style.border = "1px solid #7a31b3";
+            break;
+        case "twitter":
+            document.querySelector(".platform-icon").style.display = "inline";
+            document.querySelector(".platform-icon").src = "twitter-icon.png";
+            document.getElementById("SearchInput").placeholder = "Enter Twitter Username";
+            document.getElementById("realtime-title").innerText = "Real Time Twitter Follower Count";
+            document.getElementById("live-count-watermark").innerText = "Twitter Live Follower Count";
+            document.getElementById("live-count-watermark").style.color = "#003a70";
+            document.getElementById("platform-plus-sign").style.backgroundColor = "#317db3";
+            document.getElementById("userimg").style.border = "1px solid #317db3";
+            break;
+        case "tiktok":
+            document.querySelector(".platform-icon").style.display = "none";
+            document.getElementById("SearchInput").placeholder = "Enter TikTok Username";
+            document.getElementById("realtime-title").innerText = "Real Time TikTok Follower Count";
+            document.getElementById("live-count-watermark").innerText = "TikTok Live Follower Count";
+            document.getElementById("live-count-watermark").style.color = "#703d00";
+            document.getElementById("platform-plus-sign").style.backgroundColor = "#ff4c74";
+            document.getElementById("userimg").style.border = "1px solid #ff4c74";
+            break;
+        default:
+            document.querySelector(".platform-icon").style.display = "none";
+            document.getElementById("SearchInput").placeholder = "Enter Username";
+            document.getElementById("realtime-title").innerText = "Real Time Count";
+            document.getElementById("live-count-watermark").innerText = "Live Count";
+            document.getElementById("live-count-watermark").style.color = "#703d00";
+            document.getElementById("platform-plus-sign").style.backgroundColor = "#333333";
+            document.getElementById("userimg").style.border = "1px solid #333333";
+    }
+})
+document.getElementById("options-chart").addEventListener("change", () => {
+    if (document.getElementById("options-chart").checked) {
+        document.getElementById("chart").style.display = "block";
+    } else {
+        document.getElementById("chart").style.display = "none";
+    }
+})
 
 function resetgraph() {
 

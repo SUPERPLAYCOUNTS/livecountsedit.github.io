@@ -32,6 +32,8 @@
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,600,700" rel="stylesheet">
     <link href="../odometer.css" rel="stylesheet">
     <link href="./index.css" rel="stylesheet">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5666487244102554"
+     crossorigin="anonymous"></script>
 </head>
 
 <body class="fix-header fix-sidebar card-no-border">
@@ -93,8 +95,8 @@
                 <div class="row">
                     <!-- Column -->
                     <div class="col-12 m-t-20">
-                        <h1 class="display-title"><span class="vs1_name" id="yt_brand_vs1">Loading</span> vs <span
-                                class="vs2_name" id="yt_brand_vs2">Loading</span> Live!</h1>
+                        <h1 class="display-title"><span class="vs1_name" id="yt_brand_vs1">Akshat Mittal</span> vs <span
+                                class="vs2_name" id="yt_brand_vs2">Akshat Mittal</span> Live!</h1>
                     </div>
                 </div>
                 <div class="row">
@@ -238,53 +240,52 @@
         <div>
             <div class="option">
                 <label for="options.counter.title">Counter title/Username</label><br>
-                <input type="text" placeholder="Channel Name" class="option-input" id="options.counter.title">
+                <input type="text" placeholder="Channel Name" class="option-input" id="options.counter.title" value="User 1">
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.value">Counter value (integers only)</label><br>
-                <input type="text" placeholder="Channel Subscribers" class="option-input" id="options.counter.value">
+                <input type="text" placeholder="Channel Subscribers" class="option-input" id="options.counter.value" value="0">
                 <button onclick="submit()">Submit</button>
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.footer">Counter footer (e.g. "Subscribers", "Followers")</label><br>
                 <input type="text" placeholder="Followers, Subscribers, etc" class="option-input"
-                    id="options.counter.footer">
+                    id="options.counter.footer" value="Subscribers">
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.banner.url">Banner URL</label><br>
-                <input type="text" class="option-input" id="options.counter.banner.url"><br>
+                <input type="text" class="option-input" id="options.counter.banner.url" value="https://lcedit.com/default_banner.png"><br>
                 <strong>OR</strong>
                 <input type="file" class="option-input" id="options.counter.banner.file">
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.avatar.url">Avatar URL</label><br>
-                <input type="text" class="option-input" id="options.counter.avatar.url"><br>
+                <input type="text" class="option-input" id="options.counter.avatar.url" value="https://lcedit.com/default.png"><br>
                 <strong>OR</strong>
                 <input type="file" class="option-input" id="options.counter.avatar.file">
             </div>
             <br>
-            <button onclick="resetgraph()">Clear Graph</button>
             <p>Counter Gain Rate</p>
             <div class="option-section" id="options.counter.rates.mode.0">
                 <div class="option">
                     <p>
                         <span>Min Subs</span>
                         <span><input type="number" class="short-input option-input"
-                                id="options.counter.rates.basicMinimum"></span>
+                                id="options.counter.rates.basicMinimum" value="0"></span>
                         <br>
                         <br>
                         <span>Max Subs</span>
                         <span><input type="number" class="short-input option-input"
-                                id="options.counter.rates.basicMaximum"></span>
+                                id="options.counter.rates.basicMaximum" value="0"></span>
                         <br>
                         <br>
-                        <span>Per Every</span>
+                        <span>Update Interval</span>
                         <span><input type="number" class="short-input option-input"
-                                id="options.counter.rates.mode.basic.units"></span>
+                                id="options.counter.rates.mode.basic.units" ></span>
                         <span><select class="option-input" id="options.counter.rates.mode.basic.baseUnit">
                                 <option value="1" id="options.counter.rates.mode.basic.units.second">second(s)</option>
                                 <option value="60" id="options.counter.rates.mode.basic.units.minute">minute(s)</option>
@@ -293,70 +294,68 @@
                             </select></span>
                         <br>
                         <br>
-                        <span>Sub Gain Rate In:</span>
+                        <span>Sub Gain Rate In Per 1:</span>
                         <span><select class="option-input" id="options.counter.rates.mode.basic.baseUnit2">
-                                <option value="1" id="options.counter.rates.mode.basic.units.second2">second(s)</option>
-                                <option value="60" id="options.counter.rates.mode.basic.units.minute2">minute(s)
+                                <option value="1" id="options.counter.rates.mode.basic.units.second2">second</option>
+                                <option value="60" id="options.counter.rates.mode.basic.units.minute2">minute
                                 </option>
-                                <option value="3600" id="options.counter.rates.mode.basic.units.hour2">hour(s)</option>
-                                <option value="86400" id="options.counter.rates.mode.basic.units.day2">day(s)</option>
+                                <option value="3600" id="options.counter.rates.mode.basic.units.hour2">hour</option>
+                                <option value="86400" id="options.counter.rates.mode.basic.units.day2">day</option>
                             </select></span>
                     </p>
                 </div>
             </div>
 
-
         </div>
         <div style="float: right;">
             <div class="option">
                 <label for="options.counter.title">Counter title/Username</label><br>
-                <input type="text" placeholder="Channel Name" class="option-input" id="options.counter.title2">
+                <input type="text" placeholder="Channel Name" class="option-input" id="options.counter.title2" value="User 2">
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.value">Counter value (integers only)</label><br>
-                <input type="text" placeholder="Channel Subscribers" class="option-input" id="options.counter.value2">
+                <input type="text" placeholder="Channel Subscribers" class="option-input" id="options.counter.value2" value="0">
                 <button onclick="submit2()">Submit</button>
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.footer">Counter footer (e.g. "Subscribers", "Followers")</label><br>
                 <input type="text" placeholder="Followers, Subscribers, etc" class="option-input"
-                    id="options.counter.footer2">
+                    id="options.counter.footer2" value="Subscribers">
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.banner.url">Banner URL</label><br>
-                <input type="text" class="option-input" id="options.counter.banner.url2"><br>
+                <input type="text" class="option-input" id="options.counter.banner.url2" value="https://lcedit.com/default_banner.png"><br>
                 <strong>OR</strong>
                 <input type="file" class="option-input" id="options.counter.banner.file2">
             </div>
             <br>
             <div class="option">
                 <label for="options.counter.avatar.url">Avatar URL</label><br>
-                <input type="text" class="option-input" id="options.counter.avatar.url2"><br>
+                <input type="text" class="option-input" id="options.counter.avatar.url2" value="https://lcedit.com/default.png"><br>
                 <strong>OR</strong>
                 <input type="file" class="option-input" id="options.counter.avatar.file2">
             </div>
             <br>
-            <button onclick="resetgraph2()">Clear Graph</button>
             <p>Counter Gain Rate</p>
             <div class="option-section" id="options.counter.rates.mode.02">
                 <div class="option">
                     <p>
                         <span>Min Subs</span>
                         <span><input type="number" class="short-input option-input"
-                                id="options.counter.rates.basicMinimum2"></span>
+                                id="options.counter.rates.basicMinimum2" value="0"></span>
                         <br>
                         <br>
                         <span>Max Subs</span>
                         <span><input type="number" class="short-input option-input"
-                                id="options.counter.rates.basicMaximum2"></span>
+                                id="options.counter.rates.basicMaximum2" value="0"></span>
                         <br>
                         <br>
-                        <span>Per Every</span>
+                        <span>Update Interval</span>
                         <span><input type="number" class="short-input option-input"
-                                id="options.counter.rates.mode.basic.units2"></span>
+                                id="options.counter.rates.mode.basic.units2" value=2></span>
                         <span><select class="option-input" id="options.counter.rates.mode.basic.baseUnit3">
                                 <option value="1" id="options.counter.rates.mode.basic.units.second3">second(s)
                                 </option>
@@ -369,15 +368,15 @@
                             </select></span>
                         <br>
                         <br>
-                        <span>Sub Gain Rate In:</span>
+                        <span>Sub Gain Rate In Per 1:</span>
                         <span><select class="option-input" id="options.counter.rates.mode.basic.baseUnit4">
-                                <option value="1" id="options.counter.rates.mode.basic.units.second4">second(s)
+                                <option value="1" id="options.counter.rates.mode.basic.units.second4">second
                                 </option>
-                                <option value="60" id="options.counter.rates.mode.basic.units.minute4">minute(s)
+                                <option value="60" id="options.counter.rates.mode.basic.units.minute4">minute
                                 </option>
-                                <option value="3600" id="options.counter.rates.mode.basic.units.hour4">hour(s)
+                                <option value="3600" id="options.counter.rates.mode.basic.units.hour4">hour
                                 </option>
-                                <option value="86400" id="options.counter.rates.mode.basic.units.day4">day(s)
+                                <option value="86400" id="options.counter.rates.mode.basic.units.day4">day
                                 </option>
                             </select></span>
                     </p>
@@ -390,13 +389,17 @@
         <div class="option">
             <label>Gap Settings</label>
             <label for="options.counter.title">Text/Name</label><br>
-            <input type="text" placeholder="Channel Name" class="option-input" id="gap.title">
+            <input type="text" placeholder="Subscriber Difference" class="option-input" id="gap.title" value="Subscriber Difference">
             <br>
             <br>
-            <label for="options.counter.title">Update Interval</label><br>
-            <input type="text" placeholder="(In Seconds)" class="option-input" id="gap.time">
+            <label for="options.counter.title">Update Interval in Seconds</label><br>
+            <input type="text" class="option-input" id="gap.time" value=2>
         </div>
     </center>
+    <div style="padding:12px;">
+        <h3>Disclaimer</h3>
+        <p>This page is a parody of the <a href="https://gh.akshatmittal.com/youtube-realtime/compare/">original Akshatmittal live compare counter</a>. All credit goes to <a href="https://akshatmittal.com/">Akshatmittal</a> for the design of this page. This website is for educational and entertainment purposes only, and we do not make any profit off of this site. We believe this constitutes fair use under Title 17 U.S.C. § 107 of the Copyright Act of 1976. No copyright infringement is intended. We also do not condone the use of this site for spreading misinformation.</p>
+    </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/odometer.js/0.4.6/odometer.min.js"></script>
     <script src="./index.js"></script>

@@ -111,8 +111,8 @@ class LivecountseditInterface {
                 }
             },
             this.setAvatar2 = function () {
-                if (!document.getElementById("options.counter.avatar.file").files.length) {
-                    if (!document.getElementById("options.counter.avatar.url").value) return;
+                if (!document.getElementById("options.counter.avatar.file2").files.length) {
+                    if (!document.getElementById("options.counter.avatar.url2").value) return;
                     else document.getElementById("yt_profile_vs2").src = document.getElementById("options.counter.avatar.url2").value
                 } else {
                     document.getElementById("yt_profile_vs2").src = URL.createObjectURL(document.getElementById("options.counter.avatar.file2").files[0])
@@ -201,7 +201,29 @@ class LivecountseditInterface {
 
 
 function gap() {
-document.getElementById("yt_diff").innerHTML = Math.floor(current-current2)
+    var diff = Math.floor(current - current2);
+    document.getElementById("yt_diff").innerHTML = diff;
+
+    var iconPath = "trophy-icon.png";
+    var ytNameVs1 = document.getElementById("yt_name_vs1");
+    var ytNameVs2 = document.getElementById("yt_name_vs2");
+
+    if (ytNameVs1.querySelector("img.trophy-icon")) ytNameVs1.querySelector("img.trophy-icon").remove();
+    if (ytNameVs2.querySelector("img.trophy-icon")) ytNameVs2.querySelector("img.trophy-icon").remove();
+
+    if (diff > 0) {
+        var img = document.createElement("img");
+        img.src = iconPath;
+        img.className = "trophy-icon";
+        ytNameVs1.style.position = "relative";
+        ytNameVs1.appendChild(img);
+    } else if (diff < 0) {
+        var img = document.createElement("img");
+        img.src = iconPath;
+        img.className = "trophy-icon";
+        ytNameVs2.style.position = "relative";
+        ytNameVs2.appendChild(img);
+    }
 }
 
 const Interface = new LivecountseditInterface()

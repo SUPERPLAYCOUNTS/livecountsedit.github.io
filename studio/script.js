@@ -1,3 +1,9 @@
+window.odometerOptions = {
+	animation: "byDigit",
+	removeLeadingZeros: true,
+	format: '(,ddd)'
+};
+
 let cmm = 0;
 let raw = 0;
 let m = "100b";
@@ -10,13 +16,14 @@ const uuidGen = function () {
 	return a() + a() + '-' + a() + '-' + a() + '-' + a() + '-' + a() + a() + a();
 }
 
-const selectElement = document.getElementById('selectcomma');
-const comma1Element = document.getElementById('comma1a');
-const comma2Element = document.getElementById('comma2a');
-const comma3Element = document.getElementById('comma3a');
+const setMarginTopOfCount = function () {
+	const countElement = document.getElementById('count');
+	const value = document.getElementById('marginTopOfCount').value;
+	countElement.style.marginTop = `${value}px`;
+}
 
 let user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : {
-	name: "Loading",
+	name: "Livecountsedit",
 	image: "../default.png",
 	footer: "Subscribers",
 	count: 0,
@@ -32,7 +39,7 @@ let user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"
 	dropdownBottomText: "Live Data",
 	id: uuidGen(),
 	autosave: true,
-	//unsed by studio
+	commaFormat: '(,ddd)', 
 	banner: "",
 	textColor: "#000",
 	odometerUp: "#000",
@@ -45,8 +52,22 @@ let user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user"
 	std_gain: 0,
 	abbreviate: false,
 };
+
+if (typeof user.commaFormat === 'undefined') {
+    user.commaFormat = '(,ddd)';
+}
+window.odometerOptions.format = user.commaFormat;
+
+
 if (!user.count) {
-	user.count = user.subscribers;
+	user.count = user.subscribers || 0;
+}
+
+function render() {
+    const countElement = document.getElementById('count');
+    if (countElement) {
+        countElement.innerText = Math.round(user.count);
+    }
 }
 
 if (user.graphType == "live") {
@@ -75,7 +96,6 @@ const chart = new Highcharts.chart({
 			fontFamily: "Roboto",
 		},
 		height: (9 / 16 * 30) + '%',
-		spacingLeft: -10,
 		spacingLeft: -10,
 		marginRight: 65
 	},
@@ -139,372 +159,18 @@ const chart = new Highcharts.chart({
 });
 
 function abb(count) {
-	if (count === 0) return "0";
-	const ABBREVIATIONS = ["", "K", "M", "B"];
-	const isNegative = count < 0;
-	const absCount = Math.abs(count);
-	const index = absCount === 0 ? 0 : Math.floor(Math.log10(absCount) / 3);
-	let result = (absCount / Math.pow(1000, index)).toFixed(2).toString();
-	result += ABBREVIATIONS[index];
-	if (isNegative) {
-		result = `-${result}`;
-	}
-	const parts = result.split(".");
-	if (parts[1] && parts[1].length > 1) {
-		result = parts[0] + "." + parts[1][0];
-		result += ABBREVIATIONS[index];
-		if (isNegative) {
-			result = `-${result}`;
-		}
-	}
-	return result;
+	const negative = count < 0 ? true : false;
+    count = Math.round(Math.abs(count));
+    if (count < 1000) {
+        if (negative) return `-${count}`;
+        else return count.toString();
+    } else {
+        const abbreviations = "KMBT";
+        const a = Math.floor(Math.log10(count)/3)
+        if (negative) return "-" + (count / (1000 ** a)).toFixed(1) + abbreviations[a-1];
+        else return (count / (1000 ** a)).toFixed(1) + abbreviations[a-1];
+    }
 }
-
-function settype(n) {
-	if (n < 1000000000000) {
-		m = '100b'
-		document.querySelector("#odo1a").style.display = "inline-block"
-		document.querySelector("#odo2a").style.display = "inline-block"
-		document.querySelector("#odo3a").style.display = "inline-block"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "inline-block"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 100000000000) {
-		m = '10b'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "inline-block"
-		document.querySelector("#odo3a").style.display = "inline-block"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "inline-block"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 10000000000) {
-		m = '1b'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "inline-block"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "inline-block"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 1000000000) {
-		m = '100m'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "inline-block"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 100000000) {
-		m = '10m'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "inline-block"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 10000000) {
-		m = '1m'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "inline-block"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "inline-block"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 1000000) {
-		m = '100k'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "inline-block"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 100000) {
-		m = '10k'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "inline-block"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 10000) {
-		m = '1k'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "inline-block"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "inline-block"
-	}
-	if (n < 1000) {
-		m = '100'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "none"
-		document.querySelector("#odo10a").style.display = "inline-block"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "none"
-	}
-	if (n < 100) {
-		m = '10'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "none"
-		document.querySelector("#odo10a").style.display = "none"
-		document.querySelector("#odo11a").style.display = "inline-block"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "none"
-	}
-	if (n < 10) {
-		m = '1'
-		document.querySelector("#odo1a").style.display = "none"
-		document.querySelector("#odo2a").style.display = "none"
-		document.querySelector("#odo3a").style.display = "none"
-		document.querySelector("#odo4a").style.display = "none"
-		document.querySelector("#odo5a").style.display = "none"
-		document.querySelector("#odo6a").style.display = "none"
-		document.querySelector("#odo7a").style.display = "none"
-		document.querySelector("#odo8a").style.display = "none"
-		document.querySelector("#odo9a").style.display = "none"
-		document.querySelector("#odo10a").style.display = "none"
-		document.querySelector("#odo11a").style.display = "none"
-		document.querySelector("#odo12a").style.display = "inline-block"
-		document.querySelector("#comma1a").style.display = "none"
-		document.querySelector("#comma2a").style.display = "none"
-		document.querySelector("#comma3a").style.display = "none"
-	}
-	return m
-}
-
-function render() {
-	settype(raw)
-	if (m == '100b') {
-		odo1a.innerHTML = cmm[0]
-		odo2a.innerHTML = cmm[1]
-		odo3a.innerHTML = cmm[2]
-		odo4a.innerHTML = cmm[3]
-		odo5a.innerHTML = cmm[4]
-		odo6a.innerHTML = cmm[5]
-		odo7a.innerHTML = cmm[6]
-		odo8a.innerHTML = cmm[7]
-		odo9a.innerHTML = cmm[8]
-		odo10a.innerHTML = cmm[9]
-		odo11a.innerHTML = cmm[10]
-		odo12a.innerHTML = cmm[11]
-	}
-	if (m == '10b') {
-		odo2a.innerHTML = cmm[0]
-		odo3a.innerHTML = cmm[1]
-		odo4a.innerHTML = cmm[2]
-		odo5a.innerHTML = cmm[3]
-		odo6a.innerHTML = cmm[4]
-		odo7a.innerHTML = cmm[5]
-		odo8a.innerHTML = cmm[6]
-		odo9a.innerHTML = cmm[7]
-		odo10a.innerHTML = cmm[8]
-		odo11a.innerHTML = cmm[9]
-		odo12a.innerHTML = cmm[10]
-	}
-	if (m == '1b') {
-		odo3a.innerHTML = cmm[0]
-		odo4a.innerHTML = cmm[1]
-		odo5a.innerHTML = cmm[2]
-		odo6a.innerHTML = cmm[3]
-		odo7a.innerHTML = cmm[4]
-		odo8a.innerHTML = cmm[5]
-		odo9a.innerHTML = cmm[6]
-		odo10a.innerHTML = cmm[7]
-		odo11a.innerHTML = cmm[8]
-		odo12a.innerHTML = cmm[9]
-	}
-	if (m == '100m') {
-		odo4a.innerHTML = cmm[0]
-		odo5a.innerHTML = cmm[1]
-		odo6a.innerHTML = cmm[2]
-		odo7a.innerHTML = cmm[3]
-		odo8a.innerHTML = cmm[4]
-		odo9a.innerHTML = cmm[5]
-		odo10a.innerHTML = cmm[6]
-		odo11a.innerHTML = cmm[7]
-		odo12a.innerHTML = cmm[8]
-	}
-	if (m == '10m') {
-		odo5a.innerHTML = cmm[0]
-		odo6a.innerHTML = cmm[1]
-		odo7a.innerHTML = cmm[2]
-		odo8a.innerHTML = cmm[3]
-		odo9a.innerHTML = cmm[4]
-		odo10a.innerHTML = cmm[5]
-		odo11a.innerHTML = cmm[6]
-		odo12a.innerHTML = cmm[7]
-	}
-	if (m == '1m') {
-		odo6a.innerHTML = cmm[0]
-		odo7a.innerHTML = cmm[1]
-		odo8a.innerHTML = cmm[2]
-		odo9a.innerHTML = cmm[3]
-		odo10a.innerHTML = cmm[4]
-		odo11a.innerHTML = cmm[5]
-		odo12a.innerHTML = cmm[6]
-	}
-	if (m == '100k') {
-		odo7a.innerHTML = cmm[0]
-		odo8a.innerHTML = cmm[1]
-		odo9a.innerHTML = cmm[2]
-		odo10a.innerHTML = cmm[3]
-		odo11a.innerHTML = cmm[4]
-		odo12a.innerHTML = cmm[5]
-	}
-	if (m == '10k') {
-		odo8a.innerHTML = cmm[0]
-		odo9a.innerHTML = cmm[1]
-		odo10a.innerHTML = cmm[2]
-		odo11a.innerHTML = cmm[3]
-		odo12a.innerHTML = cmm[4]
-	}
-	if (m == '1k') {
-		odo9a.innerHTML = cmm[0]
-		odo10a.innerHTML = cmm[1]
-		odo11a.innerHTML = cmm[2]
-		odo12a.innerHTML = cmm[3]
-	}
-	if (m == '100') {
-		odo10a.innerHTML = cmm[0]
-		odo11a.innerHTML = cmm[1]
-		odo12a.innerHTML = cmm[2]
-	}
-	if (m == '10') {
-		odo11a.innerHTML = cmm[0]
-		odo12a.innerHTML = cmm[1]
-	}
-	if (m == '1') {
-		odo12a.innerHTML = cmm[0]
-	}
-}
-
-selectElement.addEventListener('change', function() {
-	const selectedValue = this.value;
-	switch(selectedValue) {
-		case 'comma1':
-			comma1Element.textContent = ',';
-			comma2Element.textContent = ',';
-			comma3Element.textContent = ',';
-			break;
-		case 'comma2':
-			comma1Element.textContent = ' ';
-			comma2Element.textContent = ' ';
-			comma3Element.textContent = ' ';
-			break;
-		default:
-			comma1Element.textContent = ',';
-			comma2Element.textContent = ',';
-			comma3Element.textContent = ',';
-	}
-});
 
 function openmenu() {
 	if (document.getElementById('settingsMenu').style.visibility == "visible") {
@@ -535,8 +201,8 @@ function submit() {
 		reader.readAsDataURL(file);
 		reader.onload = function () {
 			user.image = reader.result
+			document.getElementById('image').src = user.image;
 		};
-		document.getElementById('image').src = user.image
 	} else {
 		user.image = document.getElementById("image_input").value
 		document.getElementById('image').src = user.image
@@ -552,8 +218,6 @@ let interval;
 function update() {
 	gain = random(user.min_gain, user.max_gain)
 	user.count += gain
-	cmm = spl(user.count)
-	raw = user.count
 	if (user.graphType == "live") {
 		if (chart.series[0].data.length > user.maxPoints) {
 			chart.series[0].data[0].remove()
@@ -584,8 +248,7 @@ function submit2() {
 		user.graphValues = values.split(',')
 		let graphDates = []
 		for (let i = 0; i < user.graphDates.length; i++) {
-			user.graphDates[i] = user.graphDates[i]
-			graphDates[i] = new Date(user.graphDates[i]).getTime()
+			graphDates[i] = new Date(user.graphDates[i].trim()).getTime()
 		}
 		for (let i = 0; i < user.graphValues.length; i++) {
 			user.graphValues[i] = parseFloat(user.graphValues[i]);
@@ -614,7 +277,7 @@ function saveData() {
 }
 
 function exportData() {
-	let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(user));
+	let dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(JSON.stringify(user));
 	let dlAnchorElem = document.createElement("a");
 	dlAnchorElem.setAttribute("href", dataStr);
 	dlAnchorElem.setAttribute("download", "data.json");
@@ -623,10 +286,10 @@ function exportData() {
 
 function toggleTheme() {
 	const stylesheet = document.getElementById("themeStylesheet");
-	if (stylesheet.getAttribute("href") === "./style.css") {
-		stylesheet.setAttribute("href", "./dark.css");
+	if (stylesheet.getAttribute("href") === "./dark.css") {
+		stylesheet.setAttribute("href", "./light.css");
 	} else {
-		stylesheet.setAttribute("href", "./style.css");
+		stylesheet.setAttribute("href", "./dark.css");
 	}
 }
 
@@ -652,6 +315,10 @@ function importData() {
 				return;
 			} else {
 				user = res;
+                if (typeof user.commaFormat === 'undefined') {
+                    user.commaFormat = '(,ddd)';
+                }
+                window.odometerOptions.format = user.commaFormat;
 			}
 			localStorage.setItem("user", JSON.stringify(user))
 			location.reload()
@@ -667,25 +334,24 @@ function importData() {
 function pickChannel(channels) {
 	document.getElementById('settingsMenu').innerHTML = "";
 	for (let q = 0; q < channels.data.length; q++) {
-		let channel = channels.data[q];
+		let channelData = channels.data[q];
 		document.getElementById('settingsMenu').innerHTML += `
 		<div>
-		<img src="${channel.image}">
-		<h1>${channel.name}</h1>
-		<h2>${channel.count.toLocaleString()}</h2>
-		<p>${channel.id}</p>
-		<button onclick="selectThing('${channel.id}')">Select</button>
+		<img src="${channelData.image}">
+		<h1>${channelData.name}</h1>
+		<h2>${channelData.count.toLocaleString()}</h2>
+		<p>${channelData.id}</p>
+		<button onclick="selectThing('${channelData.id}')">Select</button>
 		<hr>
 		</div><br>`
 	}
-	document.body.appendChild(div);
 }
 
 function selectThing(id) {
 	for (let q = 0; q < importedChannels.data.length; q++) {
 		if (id == importedChannels.data[q].id) {
 			let thing = importedChannels.data[q];
-			let channel = {
+			let selectedChannel = {
 				name: thing.name,
 				count: thing.count,
 				image: thing.image,
@@ -701,7 +367,7 @@ function selectThing(id) {
 				graphDates: thing.graphDates ? thing.graphDates : [],
 				graphValues: thing.graphValues ? thing.graphValues : [],
 				liveGraph: thing.liveGraph ? thing.liveGraph : [],
-				maxPoints: thing.maxPoints ? thing.maxPoints : 1000,
+				maxPoints: thing.maxPoints ? thing.maxPoints : 100,
 				dropdownTopText: thing.dropdownTopText ? thing.dropdownTopText : "All Time",
 				dropdownBottomText: thing.dropdownBottomText ? thing.dropdownBottomText : "Live Data",
 				banner: thing.banner ? thing.banner : "",
@@ -712,12 +378,57 @@ function selectThing(id) {
 				graphColor: thing.graphColor ? thing.graphColor : "#000",
 				boxColor: thing.boxColor ? thing.boxColor : "#000",
 				bgColor: thing.bgColor ? thing.bgColor : "#000",
-			}
-			localStorage.setItem("user", JSON.stringify(channel))
+                commaFormat: thing.commaFormat || '(,ddd)'
+			};
+			localStorage.setItem("user", JSON.stringify(selectedChannel))
 			location.reload()
 		}
 	}
 }
+
+const selectCommaElement = document.getElementById('selectcomma');
+
+function applyCommaFormatAndUpdate() {
+    if (!selectCommaElement) return;
+    const selectedValue = selectCommaElement.value;
+    let newFormat = '(,ddd)'; 
+
+    if (selectedValue === 'comma1') {
+        newFormat = '(,ddd)';
+    } else if (selectedValue === 'comma2') {
+        newFormat = '(.ddd)';
+    } else if (selectedValue === 'comma3') {
+        newFormat = '( ddd)';
+    }
+
+    window.odometerOptions.format = newFormat;
+    user.commaFormat = newFormat; 
+
+    const countElement = document.getElementById('count');
+    if (countElement && countElement.odometer) {
+        countElement.odometer.options.format = newFormat;
+        countElement.odometer.update(Math.round(user.count));
+    } else {
+        render(); 
+    }
+}
+
+if (selectCommaElement) {
+    if (user.commaFormat === '(,ddd)') {
+        selectCommaElement.value = 'comma1';
+    } else if (user.commaFormat === '(.ddd)') {
+        selectCommaElement.value = 'comma2';
+    } else if (user.commaFormat === '( ddd)') {
+        selectCommaElement.value = 'comma3';
+    } else {
+        selectCommaElement.value = 'comma1'; 
+        user.commaFormat = '(,ddd)';
+        window.odometerOptions.format = '(,ddd)'; 
+    }
+
+    selectCommaElement.addEventListener('change', applyCommaFormatAndUpdate);
+}
+
 
 if (localStorage.getItem("user")) {
 	console.log(user)
@@ -730,16 +441,25 @@ if (localStorage.getItem("user")) {
 	document.getElementById('max_subs').value = user.max_gain
 	document.getElementById('updateInterval').value = user.updateInterval / 1000
 	document.getElementById('graph_type').value = user.graphType
-	document.getElementById('graph_dates').innerHTML = user.graphDates
-	document.getElementById('graph_values').innerHTML = user.graphValues
+	document.getElementById('graph_dates').innerHTML = user.graphDates.join(', ') 
+	document.getElementById('graph_values').innerHTML = user.graphValues.join(', ') 
 	document.getElementById('dropdownTopText').value = user.dropdownTopText
 	document.getElementById('dropdownBottomText').value = user.dropdownBottomText
 	document.getElementById('maxPoints').value = user.maxPoints
 	submit()
 	submit1()
 	submit2()
+    const countElem = document.getElementById('count');
+    if (countElem && countElem.odometer && countElem.odometer.options.format !== user.commaFormat) {
+        countElem.odometer.options.format = user.commaFormat;
+        countElem.odometer.update(Math.round(user.count));
+    } else if (countElem && !countElem.odometer) {
+        render();
+    }
+
+
 } else {
-	render()
+	render(); 
 }
 
 document.getElementById('autosave').onclick = function () {
